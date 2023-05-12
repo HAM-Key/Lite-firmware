@@ -1,0 +1,30 @@
+
+# the astyle option for this project
+
+--mode=c
+
+--style=google 
+
+# space around operators
+-p
+# force tab 4
+-T
+# indent switches
+-S
+# indent continuation
+-xt2
+# indent-preproc-block
+-xW
+# indent-preproc-define
+-w
+# indent-col1-comments
+-Y
+# max-continuation-indent
+-M
+# Insert space padding after commas
+-xg
+# align-pointer=type
+-k1
+
+# no backup
+-n
