@@ -70,7 +70,6 @@
 #include "ble_dis.h"
 #include "ble_conn_params.h"
 #include "sensorsim.h"
-#include "bsp_btn_ble.h"
 #include "app_scheduler.h"
 #include "nrf_sdh.h"
 #include "nrf_sdh_soc.h"
@@ -91,8 +90,9 @@
 
 #define SHIFT_BUTTON_ID                     1                                          /**< Button used as 'SHIFT' Key. */
 
-#define DEVICE_NAME                         "HAMKey-Lite[]"                          /**< Name of device. Will be included in the advertising data. */
-#define MANUFACTURER_NAME                   "HelloWorks"                      /**< Manufacturer. Will be passed to Device Information Service. */
+#define DEVICE_NAME			"HAMKey-Lite[000]"
+#define MANUFACTURER_NAME	"HelloWorks"
+#define MODEL_NAME			"HAMKey-Lite"
 
 #define APP_BLE_OBSERVER_PRIO               3                                          /**< Application's BLE observer priority. You shouldn't need to modify this value. */
 #define APP_BLE_CONN_CFG_TAG                1                                          /**< A tag identifying the SoftDevice BLE configuration. */
@@ -171,9 +171,9 @@
 
 #define SCHED_MAX_EVENT_DATA_SIZE           APP_TIMER_SCHED_EVENT_DATA_SIZE            /**< Maximum size of scheduler events. */
 #ifdef SVCALL_AS_NORMAL_FUNCTION
-	#define SCHED_QUEUE_SIZE                    20                                         /**< Maximum number of events in the scheduler queue. More is needed in case of Serialization. */
+	#define SCHED_QUEUE_SIZE                    32                                         /**< Maximum number of events in the scheduler queue. More is needed in case of Serialization. */
 #else
-	#define SCHED_QUEUE_SIZE                    10                                         /**< Maximum number of events in the scheduler queue. */
+	#define SCHED_QUEUE_SIZE                    16                                         /**< Maximum number of events in the scheduler queue. */
 #endif
 
 #define MODIFIER_KEY_POS                    0                                          /**< Position of the modifier byte in the Input Report. */
@@ -232,7 +232,7 @@ typedef struct {
 STATIC_ASSERT(sizeof(buffer_list_t) % 4 == 0);
 
 
-APP_TIMER_DEF(m_battery_timer_id);                                  /**< Battery timer. */
+// APP_TIMER_DEF(m_battery_timer_id);                                  /**< Battery timer. */
 BLE_HIDS_DEF(m_hids,                                                /**< Structure used to identify the HID service. */
 			 NRF_SDH_BLE_TOTAL_LINK_COUNT,
 			 INPUT_REPORT_KEYS_MAX_LEN,
@@ -307,20 +307,20 @@ void assert_nrf_callback(uint16_t line_num, const uint8_t* p_file_name) {
  *
  * @param[in] skip  Filter passed to @ref pm_peer_id_list.
  */
-static void whitelist_set(pm_peer_id_list_skip_t skip) {
-	pm_peer_id_t peer_ids[BLE_GAP_WHITELIST_ADDR_MAX_COUNT];
-	uint32_t     peer_id_count = BLE_GAP_WHITELIST_ADDR_MAX_COUNT;
+// static void whitelist_set(pm_peer_id_list_skip_t skip) {
+// 	pm_peer_id_t peer_ids[BLE_GAP_WHITELIST_ADDR_MAX_COUNT];
+// 	uint32_t     peer_id_count = BLE_GAP_WHITELIST_ADDR_MAX_COUNT;
 
-	ret_code_t err_code = pm_peer_id_list(peer_ids, &peer_id_count, PM_PEER_ID_INVALID, skip);
-	APP_ERROR_CHECK(err_code);
+// 	ret_code_t err_code = pm_peer_id_list(peer_ids, &peer_id_count, PM_PEER_ID_INVALID, skip);
+// 	APP_ERROR_CHECK(err_code);
 
-	NRF_LOG_INFO("\tm_whitelist_peer_cnt %d, MAX_PEERS_WLIST %d",
-				 peer_id_count + 1,
-				 BLE_GAP_WHITELIST_ADDR_MAX_COUNT);
+// 	NRF_LOG_INFO("\tm_whitelist_peer_cnt %d, MAX_PEERS_WLIST %d",
+// 				 peer_id_count + 1,
+// 				 BLE_GAP_WHITELIST_ADDR_MAX_COUNT);
 
-	err_code = pm_whitelist_set(peer_ids, peer_id_count);
-	APP_ERROR_CHECK(err_code);
-}
+// 	err_code = pm_whitelist_set(peer_ids, peer_id_count);
+// 	APP_ERROR_CHECK(err_code);
+// }
 
 
 /**@brief Function for setting filtered device identities.
@@ -358,8 +358,7 @@ static void advertising_start(bool erase_bonds) {
 		delete_bonds();
 		// Advertising is started by PM_EVT_PEERS_DELETE_SUCCEEDED event.
 	} else {
-		whitelist_set(PM_PEER_ID_LIST_SKIP_NO_ID_ADDR);
-
+		// whitelist_set(PM_PEER_ID_LIST_SKIP_NO_ID_ADDR);
 		ret_code_t ret = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
 		APP_ERROR_CHECK(ret);
 	}
@@ -376,6 +375,9 @@ static void pm_evt_handler(pm_evt_t const* p_evt) {
 	pm_handler_flash_clean(p_evt);
 
 	switch (p_evt->evt_id) {
+		case PM_EVT_CONN_SEC_START:
+			NRF_LOG_INFO("PM_EVT_CONN_SEC_START");
+			break;
 		case PM_EVT_CONN_SEC_SUCCEEDED:
 			m_peer_id = p_evt->peer_id;
 			break;
@@ -385,15 +387,26 @@ static void pm_evt_handler(pm_evt_t const* p_evt) {
 			break;
 
 		case PM_EVT_PEER_DATA_UPDATE_SUCCEEDED:
-			if (     p_evt->params.peer_data_update_succeeded.flash_changed
-					 && (p_evt->params.peer_data_update_succeeded.data_id == PM_PEER_DATA_ID_BONDING)) {
-				NRF_LOG_INFO("New Bond, add the peer to the whitelist if possible");
+			if (p_evt->params.peer_data_update_succeeded.flash_changed
+					&& (p_evt->params.peer_data_update_succeeded.data_id == PM_PEER_DATA_ID_BONDING)) {
+				NRF_LOG_INFO("New Bond");
 				// Note: You should check on what kind of white list policy your application should use.
-
-				whitelist_set(PM_PEER_ID_LIST_SKIP_NO_ID_ADDR);
+				// whitelist_set(PM_PEER_ID_LIST_SKIP_NO_ID_ADDR);
 			}
 			break;
 
+		case PM_EVT_CONN_SEC_CONFIG_REQ: {
+			// Allow pairing request from an already bonded peer.
+			NRF_LOG_INFO("PM_EVT_CONN_SEC_CONFIG_REQ");
+			pm_conn_sec_config_t conn_sec_config = {.allow_repairing = true};
+			pm_conn_sec_config_reply(p_evt->conn_handle, &conn_sec_config);
+		}
+		break;
+		case PM_EVT_STORAGE_FULL: {
+			// Run garbage collection on the flash.
+			fds_gc();
+		}
+		break;
 		default:
 			break;
 	}
@@ -449,10 +462,10 @@ static void battery_level_update(void) {
  * @param[in]   p_context   Pointer used for passing some arbitrary information (context) from the
  *                          app_start_timer() call to the timeout handler.
  */
-static void battery_level_meas_timeout_handler(void* p_context) {
-	UNUSED_PARAMETER(p_context);
-	battery_level_update();
-}
+// static void battery_level_meas_timeout_handler(void* p_context) {
+// 	UNUSED_PARAMETER(p_context);
+// 	battery_level_update();
+// }
 
 
 /**@brief Function for the Timer initialization.
@@ -466,13 +479,23 @@ static void timers_init(void) {
 	APP_ERROR_CHECK(err_code);
 
 	// Create battery timer.
-	err_code = app_timer_create(&m_battery_timer_id,
-								APP_TIMER_MODE_REPEATED,
-								battery_level_meas_timeout_handler);
-	APP_ERROR_CHECK(err_code);
+	// err_code = app_timer_create(&m_battery_timer_id,
+	// 							APP_TIMER_MODE_REPEATED,
+	// 							battery_level_meas_timeout_handler);
+	// APP_ERROR_CHECK(err_code);
 }
 
 
+// 48bit addr in LSB = bluetooth_addr.addr[6]
+ble_gap_addr_t bluetooth_addr;
+static uint8_t device_name[] = DEVICE_NAME;
+char base36(uint8_t h) {
+	char x = h % 36;
+	if(x > 9) {
+		x += 7;
+	}
+	return x + '0';
+}
 /**@brief Function for the GAP initialization.
  *
  * @details This function sets up all the necessary GAP (Generic Access Profile) parameters of the
@@ -485,12 +508,18 @@ static void gap_params_init(void) {
 
 	BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
 
+	err_code = sd_ble_gap_addr_get(&bluetooth_addr);
+	APP_ERROR_CHECK(err_code);
+
+	device_name[strlen(DEVICE_NAME) - 4] = base36(bluetooth_addr.addr[5]);
+	device_name[strlen(DEVICE_NAME) - 3] = base36(bluetooth_addr.addr[4]);
+	device_name[strlen(DEVICE_NAME) - 2] = base36(bluetooth_addr.addr[3]);
 	err_code = sd_ble_gap_device_name_set(&sec_mode,
-										  (const uint8_t*)DEVICE_NAME,
+										  (const uint8_t*)device_name,
 										  strlen(DEVICE_NAME));
 	APP_ERROR_CHECK(err_code);
 
-	err_code = sd_ble_gap_appearance_set(BLE_APPEARANCE_HID_KEYBOARD);
+	err_code = sd_ble_gap_appearance_set(BLE_APPEARANCE_HID_GAMEPAD);
 	APP_ERROR_CHECK(err_code);
 
 	memset(&gap_conn_params, 0, sizeof(gap_conn_params));
@@ -543,17 +572,11 @@ static void qwr_init(void) {
 static void dis_init(void) {
 	ret_code_t       err_code;
 	ble_dis_init_t   dis_init_obj;
-	ble_dis_pnp_id_t pnp_id;
-
-	pnp_id.vendor_id_source = PNP_ID_VENDOR_ID_SOURCE;
-	pnp_id.vendor_id        = PNP_ID_VENDOR_ID;
-	pnp_id.product_id       = PNP_ID_PRODUCT_ID;
-	pnp_id.product_version  = PNP_ID_PRODUCT_VERSION;
 
 	memset(&dis_init_obj, 0, sizeof(dis_init_obj));
 
 	ble_srv_ascii_to_utf8(&dis_init_obj.manufact_name_str, MANUFACTURER_NAME);
-	dis_init_obj.p_pnp_id = &pnp_id;
+	ble_srv_ascii_to_utf8(&dis_init_obj.model_num_str, MODEL_NAME);
 
 	dis_init_obj.dis_char_rd_sec = SEC_JUST_WORKS;
 
@@ -768,12 +791,12 @@ static void conn_params_init(void) {
 
 /**@brief Function for starting timers.
  */
-static void timers_start(void) {
-	ret_code_t err_code;
+// static void timers_start(void) {
+// 	ret_code_t err_code;
 
-	err_code = app_timer_start(m_battery_timer_id, BATTERY_LEVEL_MEAS_INTERVAL, NULL);
-	APP_ERROR_CHECK(err_code);
-}
+// 	err_code = app_timer_start(m_battery_timer_id, BATTERY_LEVEL_MEAS_INTERVAL, NULL);
+// 	APP_ERROR_CHECK(err_code);
+// }
 
 
 /**@brief   Function for transmitting a key scan Press & Release Notification.
@@ -833,9 +856,9 @@ static uint32_t send_key_scan_press_release(ble_hids_t* p_hids,
 		// Copy the scan code.
 		memcpy(data + SCAN_CODE_POS + offset, p_key_pattern + offset, data_len - offset);
 
-		if (bsp_button_is_pressed(SHIFT_BUTTON_ID)) {
-			data[MODIFIER_KEY_POS] |= SHIFT_KEY_CODE;
-		}
+		// if (bsp_button_is_pressed(SHIFT_BUTTON_ID)) {
+		// 	data[MODIFIER_KEY_POS] |= SHIFT_KEY_CODE;
+		// }
 
 		if (!m_in_boot_mode) {
 			err_code = ble_hids_inp_rep_send(p_hids,
@@ -1045,16 +1068,16 @@ static void on_hid_rep_char_write(ble_hids_evt_t* p_evt) {
 			if (!m_caps_on && ((report_val & OUTPUT_REPORT_BIT_MASK_CAPS_LOCK) != 0)) {
 				// Caps Lock is turned On.
 				NRF_LOG_INFO("Caps Lock is turned On!");
-				err_code = bsp_indication_set(BSP_INDICATE_ALERT_3);
-				APP_ERROR_CHECK(err_code);
+				// err_code = bsp_indication_set(BSP_INDICATE_ALERT_3);
+				// APP_ERROR_CHECK(err_code);
 
 				keys_send(sizeof(m_caps_on_key_scan_str), m_caps_on_key_scan_str);
 				m_caps_on = true;
 			} else if (m_caps_on && ((report_val & OUTPUT_REPORT_BIT_MASK_CAPS_LOCK) == 0)) {
 				// Caps Lock is turned Off .
 				NRF_LOG_INFO("Caps Lock is turned Off!");
-				err_code = bsp_indication_set(BSP_INDICATE_ALERT_OFF);
-				APP_ERROR_CHECK(err_code);
+				// err_code = bsp_indication_set(BSP_INDICATE_ALERT_OFF);
+				// APP_ERROR_CHECK(err_code);
 
 				keys_send(sizeof(m_caps_off_key_scan_str), m_caps_off_key_scan_str);
 				m_caps_on = false;
@@ -1073,12 +1096,12 @@ static void on_hid_rep_char_write(ble_hids_evt_t* p_evt) {
 static void sleep_mode_enter(void) {
 	ret_code_t err_code;
 
-	err_code = bsp_indication_set(BSP_INDICATE_IDLE);
-	APP_ERROR_CHECK(err_code);
+	// err_code = bsp_indication_set(BSP_INDICATE_IDLE);
+	// APP_ERROR_CHECK(err_code);
 
 	// Prepare wakeup buttons.
-	err_code = bsp_btn_ble_sleep_mode_prepare();
-	APP_ERROR_CHECK(err_code);
+	// err_code = bsp_btn_ble_sleep_mode_prepare();
+	// APP_ERROR_CHECK(err_code);
 
 	// Go to system-off mode (this function will not return; wakeup will cause a reset).
 	err_code = sd_power_system_off();
@@ -1129,38 +1152,38 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
 	switch (ble_adv_evt) {
 		case BLE_ADV_EVT_DIRECTED_HIGH_DUTY:
 			NRF_LOG_INFO("High Duty Directed advertising.");
-			err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_DIRECTED);
-			APP_ERROR_CHECK(err_code);
+			// err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_DIRECTED);
+			// APP_ERROR_CHECK(err_code);
 			break;
 
 		case BLE_ADV_EVT_DIRECTED:
 			NRF_LOG_INFO("Directed advertising.");
-			err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_DIRECTED);
-			APP_ERROR_CHECK(err_code);
+			// err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_DIRECTED);
+			// APP_ERROR_CHECK(err_code);
 			break;
 
 		case BLE_ADV_EVT_FAST:
 			NRF_LOG_INFO("Fast advertising.");
-			err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
-			APP_ERROR_CHECK(err_code);
+			// err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
+			// APP_ERROR_CHECK(err_code);
 			break;
 
 		case BLE_ADV_EVT_SLOW:
 			NRF_LOG_INFO("Slow advertising.");
-			err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_SLOW);
-			APP_ERROR_CHECK(err_code);
+			// err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_SLOW);
+			// APP_ERROR_CHECK(err_code);
 			break;
 
 		case BLE_ADV_EVT_FAST_WHITELIST:
 			NRF_LOG_INFO("Fast advertising with whitelist.");
-			err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_WHITELIST);
-			APP_ERROR_CHECK(err_code);
+			// err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_WHITELIST);
+			// APP_ERROR_CHECK(err_code);
 			break;
 
 		case BLE_ADV_EVT_SLOW_WHITELIST:
 			NRF_LOG_INFO("Slow advertising with whitelist.");
-			err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_WHITELIST);
-			APP_ERROR_CHECK(err_code);
+			// err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_WHITELIST);
+			// APP_ERROR_CHECK(err_code);
 			break;
 
 		case BLE_ADV_EVT_IDLE:
@@ -1229,8 +1252,6 @@ static void ble_evt_handler(ble_evt_t const* p_ble_evt, void* p_context) {
 	switch (p_ble_evt->header.evt_id) {
 		case BLE_GAP_EVT_CONNECTED:
 			NRF_LOG_INFO("Connected");
-			err_code = bsp_indication_set(BSP_INDICATE_CONNECTED);
-			APP_ERROR_CHECK(err_code);
 			m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
 			err_code = nrf_ble_qwr_conn_handle_assign(&m_qwr, m_conn_handle);
 			APP_ERROR_CHECK(err_code);
@@ -1240,16 +1261,10 @@ static void ble_evt_handler(ble_evt_t const* p_ble_evt, void* p_context) {
 			NRF_LOG_INFO("Disconnected");
 			// Dequeue all keys without transmission.
 			(void) buffer_dequeue(false);
-
 			m_conn_handle = BLE_CONN_HANDLE_INVALID;
-
 			// Reset m_caps_on variable. Upon reconnect, the HID host will re-send the Output
 			// report containing the Caps lock state.
 			m_caps_on = false;
-			// disabling alert 3. signal - used for capslock ON
-			err_code = bsp_indication_set(BSP_INDICATE_ALERT_OFF);
-			APP_ERROR_CHECK(err_code);
-
 			break; // BLE_GAP_EVT_DISCONNECTED
 
 		case BLE_GAP_EVT_PHY_UPDATE_REQUEST: {
@@ -1284,6 +1299,34 @@ static void ble_evt_handler(ble_evt_t const* p_ble_evt, void* p_context) {
 			APP_ERROR_CHECK(err_code);
 			break;
 
+		case BLE_GATTS_EVT_RW_AUTHORIZE_REQUEST: {
+			// Case ID: 122717
+			NRF_LOG_DEBUG("Case ID: 122717 solver");
+			ble_gatts_evt_rw_authorize_request_t  req;
+			ble_gatts_rw_authorize_reply_params_t auth_reply;
+			req = p_ble_evt->evt.gatts_evt.params.authorize_request;
+			if (req.type != BLE_GATTS_AUTHORIZE_TYPE_INVALID) {
+				if ((req.request.write.op == BLE_GATTS_OP_PREP_WRITE_REQ)     ||
+						(req.request.write.op == BLE_GATTS_OP_EXEC_WRITE_REQ_NOW) ||
+						(req.request.write.op == BLE_GATTS_OP_EXEC_WRITE_REQ_CANCEL)) {
+					if (req.type == BLE_GATTS_AUTHORIZE_TYPE_WRITE) {
+						auth_reply.type = BLE_GATTS_AUTHORIZE_TYPE_WRITE;
+					} else {
+						auth_reply.type = BLE_GATTS_AUTHORIZE_TYPE_READ;
+					}
+					if (req.request.write.op == BLE_GATTS_OP_EXEC_WRITE_REQ_CANCEL) {
+						auth_reply.params.write.gatt_status = BLE_GATT_STATUS_SUCCESS;
+					} else {
+#define APP_FEATURE_NOT_SUPPORTED        BLE_GATT_STATUS_ATTERR_APP_BEGIN + 2 /**< Reply when unsupported features are requested. */
+						auth_reply.params.write.gatt_status = APP_FEATURE_NOT_SUPPORTED;
+					}
+					err_code = sd_ble_gatts_rw_authorize_reply(p_ble_evt->evt.gatts_evt.conn_handle,
+							   &auth_reply);
+					APP_ERROR_CHECK(err_code);
+				}
+			}
+		}
+		break; // BLE_GATTS_EVT_RW_AUTHORIZE_REQUEST
 		default:
 			// No implementation needed.
 			break;
@@ -1327,49 +1370,49 @@ static void scheduler_init(void) {
  *
  * @param[in]   event   Event generated by button press.
  */
-static void bsp_event_handler(bsp_event_t event) {
-	uint32_t         err_code;
-	static uint8_t* p_key = m_sample_key_press_scan_str;
-	static uint8_t   size  = 0;
+// static void bsp_event_handler(bsp_event_t event) {
+// 	uint32_t         err_code;
+// 	static uint8_t* p_key = m_sample_key_press_scan_str;
+// 	static uint8_t   size  = 0;
 
-	switch (event) {
-		case BSP_EVENT_SLEEP:
-			sleep_mode_enter();
-			break;
+// 	switch (event) {
+// 		case BSP_EVENT_SLEEP:
+// 			sleep_mode_enter();
+// 			break;
 
-		case BSP_EVENT_DISCONNECT:
-			err_code = sd_ble_gap_disconnect(m_conn_handle,
-											 BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-			if (err_code != NRF_ERROR_INVALID_STATE) {
-				APP_ERROR_CHECK(err_code);
-			}
-			break;
+// 		case BSP_EVENT_DISCONNECT:
+// 			err_code = sd_ble_gap_disconnect(m_conn_handle,
+// 											 BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+// 			if (err_code != NRF_ERROR_INVALID_STATE) {
+// 				APP_ERROR_CHECK(err_code);
+// 			}
+// 			break;
 
-		case BSP_EVENT_WHITELIST_OFF:
-			if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
-				err_code = ble_advertising_restart_without_whitelist(&m_advertising);
-				if (err_code != NRF_ERROR_INVALID_STATE) {
-					APP_ERROR_CHECK(err_code);
-				}
-			}
-			break;
+// 		case BSP_EVENT_WHITELIST_OFF:
+// 			if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
+// 				err_code = ble_advertising_restart_without_whitelist(&m_advertising);
+// 				if (err_code != NRF_ERROR_INVALID_STATE) {
+// 					APP_ERROR_CHECK(err_code);
+// 				}
+// 			}
+// 			break;
 
-		case BSP_EVENT_KEY_0:
-			if (m_conn_handle != BLE_CONN_HANDLE_INVALID) {
-				keys_send(1, p_key);
-				p_key++;
-				size++;
-				if (size == MAX_KEYS_IN_ONE_REPORT) {
-					p_key = m_sample_key_press_scan_str;
-					size  = 0;
-				}
-			}
-			break;
+// 		case BSP_EVENT_KEY_0:
+// 			if (m_conn_handle != BLE_CONN_HANDLE_INVALID) {
+// 				keys_send(1, p_key);
+// 				p_key++;
+// 				size++;
+// 				if (size == MAX_KEYS_IN_ONE_REPORT) {
+// 					p_key = m_sample_key_press_scan_str;
+// 					size  = 0;
+// 				}
+// 			}
+// 			break;
 
-		default:
-			break;
-	}
-}
+// 		default:
+// 			break;
+// 	}
+// }
 
 
 /**@brief Function for the Peer Manager initialization.
@@ -1421,8 +1464,8 @@ static void advertising_init(void) {
 	init.advdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
 	init.advdata.uuids_complete.p_uuids  = m_adv_uuids;
 
-	init.config.ble_adv_whitelist_enabled          = true;
-	init.config.ble_adv_directed_high_duty_enabled = true;
+	init.config.ble_adv_whitelist_enabled          = false;
+	init.config.ble_adv_directed_high_duty_enabled = false;
 	init.config.ble_adv_directed_enabled           = false;
 	init.config.ble_adv_directed_interval          = 0;
 	init.config.ble_adv_directed_timeout           = 0;
@@ -1441,25 +1484,6 @@ static void advertising_init(void) {
 
 	ble_advertising_conn_cfg_tag_set(&m_advertising, APP_BLE_CONN_CFG_TAG);
 }
-
-
-/**@brief Function for initializing buttons and leds.
- *
- * @param[out] p_erase_bonds  Will be true if the clear bonding button was pressed to wake the application up.
- */
-static void buttons_leds_init(bool* p_erase_bonds) {
-	ret_code_t err_code;
-	bsp_event_t startup_event;
-
-	err_code = bsp_init(BSP_INIT_LEDS | BSP_INIT_BUTTONS, bsp_event_handler);
-	APP_ERROR_CHECK(err_code);
-
-	err_code = bsp_btn_ble_init(NULL, &startup_event);
-	APP_ERROR_CHECK(err_code);
-
-	*p_erase_bonds = (startup_event == BSP_EVENT_CLEAR_BONDING_DATA);
-}
-
 
 /**@brief Function for initializing the nrf log module.
  */
@@ -1495,12 +1519,9 @@ static void idle_state_handle(void) {
 /**@brief Function for application main entry.
  */
 int main(void) {
-	bool erase_bonds;
-
 	// Initialize.
 	log_init();
 	timers_init();
-	buttons_leds_init(&erase_bonds);
 	power_management_init();
 	ble_stack_init();
 	scheduler_init();
@@ -1515,8 +1536,8 @@ int main(void) {
 
 	// Start execution.
 	NRF_LOG_INFO("HID Keyboard example started.");
-	timers_start();
-	advertising_start(erase_bonds);
+	// timers_start();
+	advertising_start(false);
 
 	// Enter main loop.
 	for (;;) {

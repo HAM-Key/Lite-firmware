@@ -137,6 +137,7 @@
       <file file_name="$(SDK171_ROOT)/components/softdevice/common/nrf_sdh_ble.c" />
       <file file_name="$(SDK171_ROOT)/components/softdevice/common/nrf_sdh_soc.c" />
     </folder>
+    <configuration Name="Debug" gcc_optimization_level="Level 2 for size" />
   </project>
   <configuration
     Name="Release"
