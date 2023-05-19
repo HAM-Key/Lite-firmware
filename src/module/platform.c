@@ -106,15 +106,69 @@ uint32_t read_uicr_nfc_config(void) {
 }
 
 void leds_config(void) {
-	// nrf_gpio_cfg_output(LED_PIN);
-	// nrf_gpio_pin_set(LED_PIN);
+	nrf_gpio_cfg_output(LED_RED_PIN);
+	nrf_gpio_pin_set(LED_RED_PIN);
+	nrf_gpio_cfg_output(LED_BLUE_PIN);
+	nrf_gpio_pin_set(LED_BLUE_PIN);
+	nrf_gpio_cfg_output(LED_WHITE_PIN);
+	nrf_gpio_pin_set(LED_WHITE_PIN);
+
+	nrf_gpio_cfg(BUZZER_PIN,
+				 NRF_GPIO_PIN_DIR_OUTPUT,
+				 NRF_GPIO_PIN_INPUT_DISCONNECT,
+				 NRF_GPIO_PIN_NOPULL,
+				 NRF_GPIO_PIN_H0D1,
+				 NRF_GPIO_PIN_NOSENSE);
+	nrf_gpio_pin_set(BUZZER_PIN);
 }
-void led_on(void) {
-	// nrf_gpio_pin_clear(LED_PIN);
+void buzzer_set(bool v) {
+	if(v) {
+		nrf_gpio_pin_clear(BUZZER_PIN);
+	} else {
+		nrf_gpio_pin_set(BUZZER_PIN);
+	}
+}
+void led_red_set(bool v) {
+	if(v) {
+		nrf_gpio_pin_clear(LED_RED_PIN);
+	} else {
+		nrf_gpio_pin_set(LED_RED_PIN);
+	}
+}
+void led_blue_set(bool v) {
+	if(v) {
+		nrf_gpio_pin_clear(LED_BLUE_PIN);
+	} else {
+		nrf_gpio_pin_set(LED_BLUE_PIN);
+	}
+}
+void led_white_set(bool v) {
+	if(v) {
+		nrf_gpio_pin_clear(LED_WHITE_PIN);
+	} else {
+		nrf_gpio_pin_set(LED_WHITE_PIN);
+	}
 }
 
-void led_off(void) {
-	// nrf_gpio_pin_set(LED_PIN);
+void switch_btn_config(void) {
+	nrf_gpio_cfg(SW1_PIN,
+				 NRF_GPIO_PIN_DIR_INPUT,
+				 NRF_GPIO_PIN_INPUT_CONNECT,
+				 NRF_GPIO_PIN_NOPULL,
+				 NRF_GPIO_PIN_S0S1,
+				 NRF_GPIO_PIN_NOSENSE);
+	nrf_gpio_cfg(SW2_PIN,
+				 NRF_GPIO_PIN_DIR_INPUT,
+				 NRF_GPIO_PIN_INPUT_CONNECT,
+				 NRF_GPIO_PIN_NOPULL,
+				 NRF_GPIO_PIN_S0S1,
+				 NRF_GPIO_PIN_NOSENSE);
+	nrf_gpio_cfg(BUTTON_PIN,
+				 NRF_GPIO_PIN_DIR_INPUT,
+				 NRF_GPIO_PIN_INPUT_CONNECT,
+				 BUTTON_PULL,
+				 NRF_GPIO_PIN_S0S1,
+				 NRF_GPIO_PIN_NOSENSE);
 }
 
 nrf_saadc_value_t adc_buffer[8];
@@ -229,7 +283,8 @@ void platform_init(void) {
 	APP_SCHED_INIT(16, 32);
 	user_event_init();
 	power_management_init();
-
+	leds_config();
+	switch_btn_config();
 	// adc_config();
 	bluetooth_init();
 

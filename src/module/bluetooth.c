@@ -455,35 +455,14 @@ static void battery_level_update(void) {
 	}
 }
 
-
-/**@brief Function for handling the Battery measurement timer timeout.
- *
- * @details This function will be called each time the battery level measurement timer expires.
- *
- * @param[in]   p_context   Pointer used for passing some arbitrary information (context) from the
- *                          app_start_timer() call to the timeout handler.
- */
-// static void battery_level_meas_timeout_handler(void* p_context) {
-// 	UNUSED_PARAMETER(p_context);
-// 	battery_level_update();
-// }
-
-
 /**@brief Function for the Timer initialization.
  *
  * @details Initializes the timer module.
  */
 static void timers_init(void) {
 	ret_code_t err_code;
-
 	err_code = app_timer_init();
 	APP_ERROR_CHECK(err_code);
-
-	// Create battery timer.
-	// err_code = app_timer_create(&m_battery_timer_id,
-	// 							APP_TIMER_MODE_REPEATED,
-	// 							battery_level_meas_timeout_handler);
-	// APP_ERROR_CHECK(err_code);
 }
 
 
@@ -790,16 +769,6 @@ static void conn_params_init(void) {
 }
 
 
-/**@brief Function for starting timers.
- */
-// static void timers_start(void) {
-// 	ret_code_t err_code;
-
-// 	err_code = app_timer_start(m_battery_timer_id, BATTERY_LEVEL_MEAS_INTERVAL, NULL);
-// 	APP_ERROR_CHECK(err_code);
-// }
-
-
 /**@brief   Function for transmitting a key scan Press & Release Notification.
  *
  * @warning This handler is an example only. You need to analyze how you wish to send the key
@@ -1042,6 +1011,13 @@ static void keys_send(uint8_t key_pattern_len, uint8_t* p_key_pattern) {
 	}
 }
 
+void char_send(uint8_t character) {
+	static uint8_t c = 0;
+	c = character;
+	if(m_conn_handle != BLE_CONN_HANDLE_INVALID) {
+		keys_send(1, &c);
+	}
+}
 
 /**@brief Function for handling the HID Report Characteristic Write event.
  *
@@ -1121,10 +1097,12 @@ static void on_hids_evt(ble_hids_t* p_hids, ble_hids_evt_t* p_evt) {
 	switch (p_evt->evt_type) {
 		case BLE_HIDS_EVT_BOOT_MODE_ENTERED:
 			m_in_boot_mode = true;
+			NRF_LOG_INFO("HID Boot mode.");
 			break;
 
 		case BLE_HIDS_EVT_REPORT_MODE_ENTERED:
 			m_in_boot_mode = false;
+			NRF_LOG_INFO("HID Report mode.");
 			break;
 
 		case BLE_HIDS_EVT_REP_CHAR_WRITE:

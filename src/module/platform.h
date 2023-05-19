@@ -28,6 +28,7 @@ void LOG_HEX_RAW_IMP(const uint8_t* array, uint16_t length);
 #define LED_RED_PIN (1)
 #define LED_BLUE_PIN (4)
 #define LED_WHITE_PIN (16)
+#define BUZZER_PIN (9)
 
 #define SW1_PIN (15)
 #define SW2_PIN (14)
@@ -52,6 +53,11 @@ void platform_powerdown(bool flag);
 void adc_config(void);
 void adc_start(void);
 int16_t adc_get(uint8_t channel);
+
+void buzzer_set(bool v);
+void led_red_set(bool v);
+void led_blue_set(bool v);
+void led_white_set(bool v);
 
 #define UEVT_SYS_BASE (0xAE00)
 // 上电信号

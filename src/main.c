@@ -7,12 +7,155 @@
 #include "uevent.h"
 #include "bluetooth.h"
 
+#include "nrf_gpio.h"
+#include "app_timer.h"
 
 #ifdef CONFIG_NFCT_PINS_AS_GPIOS
 	volatile uint32_t UICR_ADDR_0x20C __attribute__((section("uicr_nfc"))) = 0xFFFFFFFE;
 #endif
 
+// TODO:
+// 广播状态蓝灯闪烁，连接状态蓝灯熄灭
+// 连接状态，识别到“点”闪红灯，识别到“划”闪蓝灯，发送字符闪白灯
+// 低电状态红灯闪烁，不再闪点划灯。
+// 开机或唤醒，蜂鸣器短鸣一次
+// buzzer开时，蜂鸣器跟随按键，蜂鸣器最多连续鸣响3秒
+
+static bool is_buzzer_on = false;
+static void buzzer_switch_routine(void) {
+	static uint8_t buzzer_onoff = 0;
+	if(nrf_gpio_pin_read(SW1_PIN) == 1) {
+		if(buzzer_onoff < 50) {
+			buzzer_onoff += 1;
+			if(buzzer_onoff >= 50) {
+				LOG_RAW("BUZZER ON\n");
+				is_buzzer_on = true;
+			}
+		}
+	} else {
+		if(buzzer_onoff > 0) {
+			buzzer_onoff -= 1;
+			if(buzzer_onoff == 0) {
+				LOG_RAW("BUZZER OFF\n");
+				is_buzzer_on = false;
+				// TODO: 打断buzzer事件
+				nrf_gpio_pin_set(BUZZER_PIN);
+			}
+		}
+	}
+}
+
+static void led_routine(void) {
+
+}
+static void buzzer_routine(void) {
+
+}
+static void btn_buzzer_routine(void) {
+	static uint16_t buzzer_time = 0;
+	if(is_buzzer_on) {
+		if(nrf_gpio_pin_read(BUTTON_PIN) == 1) {
+			if(buzzer_time >= 300) {
+				nrf_gpio_pin_set(BUZZER_PIN);
+			} else {
+				nrf_gpio_pin_clear(BUZZER_PIN);
+				buzzer_time += 1;
+			}
+		} else {
+			nrf_gpio_pin_set(BUZZER_PIN);
+			buzzer_time = 0;
+		}
+	}
+}
+
+#define BASE_TIME (8)
+
+uint8_t dida_depth = 0;
+uint8_t dida_idle_timer = 0;
+uint8_t dida_cache[8];
+uint8_t valid_cache[8];
+static void dida_push(uint8_t time) {
+	if(dida_depth < 8) {
+		dida_cache[dida_depth] = time;
+		dida_depth += 1;
+		dida_idle_timer = 50;
+	}
+}
+extern void char_send(uint8_t character);
+static void dida_parse(void) {
+	if(dida_depth <= 6) {
+		for (uint8_t i = 0; i < dida_depth; i++) {
+			LOG_RAW("[%d]", dida_cache[i]);
+		}
+		LOG_RAW("\n");
+		for (uint8_t i = 0; i < dida_depth; i++) {
+			if(dida_cache[i] <= BASE_TIME + 1) {
+				LOG_RAW(".")
+			} else if(dida_cache[i] >= BASE_TIME * 2.5 && dida_cache[i] <= BASE_TIME * 3.5) {
+				LOG_RAW("_")
+			} else {
+				LOG_RAW("|", dida_cache[i]);
+			}
+			if(dida_cache[i] <= BASE_TIME * 1.5) {
+				valid_cache[i] = 0;
+			} else if(dida_cache[i] >= BASE_TIME * 2 && dida_cache[i] <= BASE_TIME * 3.5) {
+				valid_cache[i] = 1;
+			} else {
+				valid_cache[i] = 0xFF;
+			}
+		}
+		if(dida_depth == 3) {
+			if(valid_cache[0] == 0 && valid_cache[1] == 0 && valid_cache[2] == 0) {
+				LOG_RAW("S")
+				// char_send(31);	// 2
+				char_send(0x04 + 's' - 'a');
+			}
+			if(valid_cache[0] == 1 && valid_cache[1] == 1 && valid_cache[2] == 1) {
+				LOG_RAW("O")
+				char_send(0x04 + 'o' - 'a');
+			}
+		}
+	}
+	LOG_RAW("\n");
+	dida_depth = 0;
+}
+
+static void btn_routine(void) {
+	static uint8_t current_btn_time = 0;
+	if(nrf_gpio_pin_read(BUTTON_PIN) == 1) {
+		if(current_btn_time < 100) {
+			current_btn_time += 1;
+		}
+	} else {
+		if(current_btn_time > 0 && current_btn_time < 50) {
+			dida_push(current_btn_time);
+			current_btn_time = 0;
+		}
+		if(dida_idle_timer > 0) {
+			dida_idle_timer -= 1;
+			if(dida_idle_timer == 29) {
+				dida_parse();
+			}
+			if(dida_idle_timer == 1) {
+				// TODO: send space
+			}
+		}
+	}
+}
+
+APP_TIMER_DEF(sys_100hz_timer);
+static void sys_100hz_handler(void* p_context) {
+	btn_routine();
+	buzzer_switch_routine();
+	btn_buzzer_routine();
+	buzzer_routine();
+	led_routine();
+}
+
 void user_init(void) {
+	uint32_t err;
+	err = app_timer_create(&sys_100hz_timer, APP_TIMER_MODE_REPEATED, sys_100hz_handler);
+	APP_ERROR_CHECK(err);
 }
 
 void main(void) {
@@ -23,6 +166,7 @@ void main(void) {
 	uevt_bc_e(UEVT_SYS_SETUP);
 	NRF_LOG_INFO("HAMKey-Lite started.");
 	bluetooth_adv_start(false);
+	app_timer_start(sys_100hz_timer, APP_TIMER_TICKS(10), NULL);
 
 	for (;;) {
 		platform_scheduler();
