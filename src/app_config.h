@@ -44,8 +44,10 @@
 // #define RNG_ENABLED 1
 // #define NRFX_RNG_ENABLED 1
 
-
-#define USE_RC_32K (1)
+#define MINIMAL_PERI_MODE 1
+#if MINIMAL_PERI_MODE==1
+	#define USE_RC_32K (1)
+#endif
 
 #if USE_RC_32K==1
 	#define NRF_SDH_CLOCK_LF_SRC 0
@@ -61,12 +63,6 @@
 //#define NRF_BLE_GATT_MAX_MTU_SIZE 23
 
 //#define PEER_MANAGER_ENABLED 1
-
-// #define PWM_ENABLED 1
-// #define PWM0_ENABLED 1
-// #define PWM1_ENABLED 1
-// #define PWM2_ENABLED 1
-// #define APP_PWM_ENABLED 1
 
 #define BLE_BAS_ENABLED 1
 #define BLE_DIS_ENABLED 1
