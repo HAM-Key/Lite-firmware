@@ -17,12 +17,13 @@
 // TODO:
 // 电量检测
 // 低电状态红灯闪烁，不再闪点划灯
-// buzzer开关打开时，蓝牙连接鸣响2次
+//// [DONE] buzzer开关打开时，蓝牙连接则鸣响2次
 //// [DONE] 广播状态蓝灯闪烁不闪点划灯，连接状态蓝灯熄灭
 //// [DONE] 连接状态，识别到“点”闪红灯，识别到“划”闪蓝灯，发送字符闪白灯
 //// [DONE] 开机或唤醒，蜂鸣器鸣响加号摩斯码
 //// [DONE] buzzer开时，蜂鸣器跟随按键，蜂鸣器最多连续鸣响3秒
-// 自拍杆模式
+// 长按3秒进入自拍杆模式，按键发送音量减。长按退出
+// 按住按键启动重置蓝牙
 
 
 #define BUZZER_ON() nrf_gpio_pin_clear(BUZZER_PIN)
@@ -107,6 +108,7 @@ static void led_routine(void) {
 	}
 }
 
+const uint8_t buzzer_task_dit[] = {8, 8, 0};
 const uint8_t buzzer_task_plus[] = {8, 8, 24, 8, 8, 8, 24, 8, 8, 0};
 const uint8_t* buzzer_task = NULL;
 uint8_t buzzer_task_counter = 0;
@@ -150,7 +152,7 @@ static void buzzer_routine(void) {
 
 static void btn_buzzer_routine(void) {
 	static uint16_t buzzer_time = 0;
-	if(is_buzzer_on) {
+	if(is_buzzer_on && buzzer_task_counter == 0) {
 		if(nrf_gpio_pin_read(BUTTON_PIN) == 1) {
 			if(buzzer_time >= 300) {
 				BUZZER_OFF();
@@ -273,13 +275,28 @@ static void btn_routine(void) {
 
 static void func_routine(void) {
 	static uint8_t bt_adv_tmr = 0;
+	static bool old_bt_connected = false;
+	static uint8_t bt_connected_timer = 0;
 	if(!is_bt_connected()) {
+		bt_connected_timer = 0;
+		old_bt_connected = false;
 		bt_adv_tmr += 1;
 		if(bt_adv_tmr >= 100) {
 			bt_adv_tmr = 0;
 			led_blink(1, 7);
 		}
+	} else {
+		if(!old_bt_connected) {
+			bt_connected_timer += 1;
+			if(bt_connected_timer >= 100) {
+				old_bt_connected = true;
+				if(is_buzzer_on) {
+					buzzer_task_start(buzzer_task_dit, 2);
+				}
+			}
+		}
 	}
+
 }
 
 APP_TIMER_DEF(sys_100hz_timer);
