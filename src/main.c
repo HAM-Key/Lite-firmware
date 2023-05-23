@@ -68,14 +68,36 @@ static void btn_buzzer_routine(void) {
 	}
 }
 
+#define MAX_CODE_LENGTH (9)
+#include "morse_code.h"
+uint8_t morse_code_parse(uint8_t* c, uint8_t length) {
+	const sMC* node = &node_root;
+	if((length > MAX_CODE_LENGTH ) || (length == 0)) {
+		return 0xFF;
+	}
+	while(length > 0) {
+		if(*c > 0) {
+			node = node->dah;
+		} else {
+			node = node->dit;
+		}
+		if(node == &node_null) {
+			return 0xFF;
+		}
+		c += 1;
+		length -= 1;
+	}
+	return node->code;
+}
+
 #define BASE_TIME (8)
 
 uint8_t dida_depth = 0;
 uint8_t dida_idle_timer = 0;
-uint8_t dida_cache[8];
-uint8_t valid_cache[8];
+uint8_t dida_cache[9];
+uint8_t valid_cache[9];
 static void dida_push(uint8_t time) {
-	if(dida_depth < 8) {
+	if(dida_depth < 9) {
 		dida_cache[dida_depth] = time;
 		dida_depth += 1;
 		dida_idle_timer = 50;
@@ -83,7 +105,7 @@ static void dida_push(uint8_t time) {
 }
 extern void char_send(uint8_t character);
 static void dida_parse(void) {
-	if(dida_depth <= 6) {
+	if(dida_depth <= 9) {
 		for (uint8_t i = 0; i < dida_depth; i++) {
 			LOG_RAW("[%d]", dida_cache[i]);
 		}
@@ -102,18 +124,12 @@ static void dida_parse(void) {
 				valid_cache[i] = 1;
 			} else {
 				valid_cache[i] = 0xFF;
+				break;
 			}
 		}
-		if(dida_depth == 3) {
-			if(valid_cache[0] == 0 && valid_cache[1] == 0 && valid_cache[2] == 0) {
-				LOG_RAW("S")
-				// char_send(31);	// 2
-				char_send(0x04 + 's' - 'a');
-			}
-			if(valid_cache[0] == 1 && valid_cache[1] == 1 && valid_cache[2] == 1) {
-				LOG_RAW("O")
-				char_send(0x04 + 'o' - 'a');
-			}
+		uint8_t send_code = morse_code_parse(valid_cache, dida_depth);
+		if(send_code != 0xFF) {
+			char_send(send_code);
 		}
 	}
 	LOG_RAW("\n");
@@ -137,7 +153,7 @@ static void btn_routine(void) {
 				dida_parse();
 			}
 			if(dida_idle_timer == 1) {
-				// TODO: send space
+				char_send(KEY_SPACE);
 			}
 		}
 	}
