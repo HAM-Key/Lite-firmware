@@ -1012,6 +1012,11 @@ static void keys_send(uint8_t key_pattern_len, uint8_t* p_key_pattern) {
 	}
 }
 
+void str_send(uint8_t* str, uint8_t len) {
+	if(m_conn_handle != BLE_CONN_HANDLE_INVALID) {
+		keys_send(len, str);
+	}
+}
 void char_send(uint8_t character) {
 	static uint8_t c = 0;
 	c = character;

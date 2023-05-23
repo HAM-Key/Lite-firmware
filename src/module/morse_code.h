@@ -20,6 +20,11 @@ const sMC node_null = {
 	0xFF
 };
 
+NODEF(SOS, 0xFE);
+NODE(3100, 0xFF, SOS, null);
+NODE(310, 0xFF, 3100, null);
+NODE(31, 0xFF, 310, null);
+
 // dit
 NODEF(apostrophe, KEY_APOSTROPHE);
 NODEF(dot, KEY_DOT);
@@ -30,7 +35,7 @@ NODE(r10, 0xFF, null, dot);
 NODE(u10, 0xFF, qm, null);
 NODEF(2, KEY_2);
 NODE(v0, 0xFF,  null,  end);
-NODEF(3, KEY_3);
+NODE(3, KEY_3, null, 31);
 NODEF(4, KEY_4);
 NODEF(5, KEY_5);
 NODEF(p, KEY_P);

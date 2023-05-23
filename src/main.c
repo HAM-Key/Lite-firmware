@@ -127,6 +127,7 @@ static void dida_push(uint8_t time) {
 	}
 }
 extern void char_send(uint8_t character);
+extern void str_send(uint8_t* str, uint8_t len);
 static void dida_parse(void) {
 	if(dida_depth <= 9) {
 		for (uint8_t i = 0; i < dida_depth; i++) {
@@ -151,7 +152,11 @@ static void dida_parse(void) {
 			}
 		}
 		uint8_t send_code = morse_code_parse(valid_cache, dida_depth);
-		if(send_code != 0xFF) {
+		if(send_code == 0xFE) {
+			static uint8_t sos[2] = {KEY_S, KEY_O};
+			str_send(sos, 2);
+			char_send(KEY_S);
+		} else if(send_code != 0xFF) {
 			char_send(send_code);
 		}
 	}
