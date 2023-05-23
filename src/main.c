@@ -30,7 +30,7 @@
 static bool is_buzzer_on = false;
 static void buzzer_switch_routine(void) {
 	static uint8_t buzzer_onoff = 0;
-	if(nrf_gpio_pin_read(SW1_PIN) == 1) {
+	if(nrf_gpio_pin_read(SW1_PIN) > 0) {
 		if(buzzer_onoff < 50) {
 			buzzer_onoff += 1;
 			if(buzzer_onoff >= 50) {
@@ -308,7 +308,9 @@ void main(void) {
 	NRF_LOG_INFO("HAMKey-Lite started.");
 	bluetooth_adv_start(false);
 	app_timer_start(sys_100hz_timer, APP_TIMER_TICKS(10), NULL);
-	buzzer_task_start(buzzer_task_plus, 1);
+	if(nrf_gpio_pin_read(SW1_PIN) > 0) {
+		buzzer_task_start(buzzer_task_plus, 1);
+	}
 	led_slow_blink(0);
 	led_slow_blink(1);
 	led_slow_blink(2);
