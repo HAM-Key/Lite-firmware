@@ -158,6 +158,10 @@ static void dida_parse(void) {
 			char_send(KEY_S);
 		} else if(send_code != 0xFF) {
 			char_send(send_code);
+			if(send_code == KEY_ENTER) {
+				// no space after enter key
+				dida_idle_timer = 0;
+			}
 		}
 	}
 	LOG_RAW("\n");
