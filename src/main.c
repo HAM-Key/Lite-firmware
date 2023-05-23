@@ -15,12 +15,19 @@
 #endif
 
 // TODO:
-// 广播状态蓝灯闪烁，连接状态蓝灯熄灭
-// 连接状态，识别到“点”闪红灯，识别到“划”闪蓝灯，发送字符闪白灯
-// 低电状态红灯闪烁，不再闪点划灯。
-// 开机或唤醒，蜂鸣器短鸣一次
-// buzzer开时，蜂鸣器跟随按键，蜂鸣器最多连续鸣响3秒
+// 电量检测
+// 低电状态红灯闪烁，不再闪点划灯
+// 广播状态蓝灯闪烁不闪点划灯，连接状态蓝灯熄灭
+//// [DONE] 连接状态，识别到“点”闪红灯，识别到“划”闪蓝灯，发送字符闪白灯
 
+
+//// [DONE] 开机或唤醒，蜂鸣器鸣响加号摩斯码
+//// [DONE]buzzer开时，蜂鸣器跟随按键，蜂鸣器最多连续鸣响3秒
+// 自拍杆模式
+
+
+#define BUZZER_ON() nrf_gpio_pin_clear(BUZZER_PIN)
+#define BUZZER_OFF() nrf_gpio_pin_set(BUZZER_PIN)
 static bool is_buzzer_on = false;
 static void buzzer_switch_routine(void) {
 	static uint8_t buzzer_onoff = 0;
@@ -39,7 +46,7 @@ static void buzzer_switch_routine(void) {
 				LOG_RAW("BUZZER OFF\n");
 				is_buzzer_on = false;
 				// TODO: 打断buzzer事件
-				nrf_gpio_pin_set(BUZZER_PIN);
+				BUZZER_OFF();
 			}
 		}
 	}
@@ -68,24 +75,82 @@ static void caps_switch_routine(void) {
 }
 
 
-static void led_routine(void) {
+void (*const led_set[3])(bool) = {
+	led_red_set,
+	led_blue_set,
+	led_white_set
+};
+const uint8_t led_off_click_timer[3] = {10, 10, 30};
+static uint8_t led_off_timer[3] = {0, 0, 0};
+static void led_click_blink(uint8_t led) {
+	led_set[led](1);
+	led_off_timer[led] = led_off_click_timer[led];
+}
 
+static void led_routine(void) {
+	for (uint8_t i = 0; i < 3; i++) {
+		if(led_off_timer[i] > 0) {
+			led_off_timer[i] -= 1;
+			if(led_off_timer[i] == 0) {
+				led_set[i](0);
+			}
+		}
+	}
+}
+
+const uint8_t buzzer_task_plus[] = {8, 8, 24, 8, 8, 8, 24, 8, 8, 0};
+const uint8_t* buzzer_task = NULL;
+uint8_t buzzer_task_counter = 0;
+uint8_t buzzer_task_p = 0;
+uint8_t buzzer_task_timer = 0;
+void buzzer_task_start(const uint8_t* task, uint8_t count) {
+	BUZZER_ON();
+	buzzer_task_p = 0;
+	buzzer_task_timer = task[0];
+	buzzer_task_counter = count;
+	buzzer_task = task;
 }
 static void buzzer_routine(void) {
-
+	if(buzzer_task_counter == 0) {
+		return;
+	}
+	if(buzzer_task_timer > 0) {
+		buzzer_task_timer -= 1;
+		return;
+	}
+	buzzer_task_p += 1;
+	buzzer_task_timer = buzzer_task[buzzer_task_p];
+	if(buzzer_task_timer == 0) {
+		if(buzzer_task_counter <= 1) {
+			buzzer_task_counter = 0;
+			BUZZER_OFF();
+		} else {
+			buzzer_task_counter -= 1;
+			buzzer_task_timer = buzzer_task[0];
+			buzzer_task_p = 0;
+			BUZZER_ON();
+		}
+		return;
+	}
+	if(buzzer_task_p & 0x1) {
+		BUZZER_OFF();
+	} else {
+		BUZZER_ON();
+	}
 }
+
 static void btn_buzzer_routine(void) {
 	static uint16_t buzzer_time = 0;
 	if(is_buzzer_on) {
 		if(nrf_gpio_pin_read(BUTTON_PIN) == 1) {
 			if(buzzer_time >= 300) {
-				nrf_gpio_pin_set(BUZZER_PIN);
+				BUZZER_OFF();
 			} else {
-				nrf_gpio_pin_clear(BUZZER_PIN);
+				BUZZER_ON();
 				buzzer_time += 1;
 			}
 		} else {
-			nrf_gpio_pin_set(BUZZER_PIN);
+			BUZZER_OFF();
 			buzzer_time = 0;
 		}
 	}
@@ -157,6 +222,7 @@ static void dida_parse(void) {
 			str_send(sos, 2);
 			char_send(KEY_S);
 		} else if(send_code != 0xFF) {
+			led_click_blink(2);
 			char_send(send_code);
 			if(send_code == KEY_ENTER) {
 				// no space after enter key
@@ -176,6 +242,11 @@ static void btn_routine(void) {
 		}
 	} else {
 		if(current_btn_time > 0 && current_btn_time < 50) {
+			if(current_btn_time <= BASE_TIME * 1.5) {
+				led_click_blink(0);
+			} else if(current_btn_time >= BASE_TIME * 2 && current_btn_time <= BASE_TIME * 3.5) {
+				led_click_blink(1);
+			}
 			dida_push(current_btn_time);
 			current_btn_time = 0;
 		}
@@ -216,7 +287,10 @@ void main(void) {
 	NRF_LOG_INFO("HAMKey-Lite started.");
 	bluetooth_adv_start(false);
 	app_timer_start(sys_100hz_timer, APP_TIMER_TICKS(10), NULL);
-
+	buzzer_task_start(buzzer_task_plus, 1);
+	led_click_blink(0);
+	led_click_blink(1);
+	led_click_blink(2);
 	for (;;) {
 		platform_scheduler();
 	}
