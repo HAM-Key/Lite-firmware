@@ -45,6 +45,29 @@ static void buzzer_switch_routine(void) {
 	}
 }
 
+bool is_caps_on = false;
+static void caps_switch_routine(void) {
+	static uint8_t caps_onoff = 0;
+	if(nrf_gpio_pin_read(SW2_PIN) == 1) {
+		if(caps_onoff < 50) {
+			caps_onoff += 1;
+			if(caps_onoff >= 50) {
+				LOG_RAW("CAPS ON\n");
+				is_caps_on = true;
+			}
+		}
+	} else {
+		if(caps_onoff > 0) {
+			caps_onoff -= 1;
+			if(caps_onoff == 0) {
+				LOG_RAW("CAPS OFF\n");
+				is_caps_on = false;
+			}
+		}
+	}
+}
+
+
 static void led_routine(void) {
 
 }
@@ -163,6 +186,7 @@ APP_TIMER_DEF(sys_100hz_timer);
 static void sys_100hz_handler(void* p_context) {
 	btn_routine();
 	buzzer_switch_routine();
+	caps_switch_routine();
 	btn_buzzer_routine();
 	buzzer_routine();
 	led_routine();

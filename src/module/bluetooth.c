@@ -800,6 +800,7 @@ static void conn_params_init(void) {
  *             In case an offset of 4 was provided, the pattern notifications sent will be from 5-7
  *             will be transmitted.
  */
+extern bool is_caps_on;
 static uint32_t send_key_scan_press_release(ble_hids_t* p_hids,
 		uint8_t*     p_key_pattern,
 		uint16_t     pattern_len,
@@ -826,9 +827,9 @@ static uint32_t send_key_scan_press_release(ble_hids_t* p_hids,
 		// Copy the scan code.
 		memcpy(data + SCAN_CODE_POS + offset, p_key_pattern + offset, data_len - offset);
 
-		// if (bsp_button_is_pressed(SHIFT_BUTTON_ID)) {
-		// 	data[MODIFIER_KEY_POS] |= SHIFT_KEY_CODE;
-		// }
+		if (is_caps_on) {
+			data[MODIFIER_KEY_POS] |= SHIFT_KEY_CODE;
+		}
 
 		if (!m_in_boot_mode) {
 			err_code = ble_hids_inp_rep_send(p_hids,
