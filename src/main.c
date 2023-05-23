@@ -86,6 +86,10 @@ static void led_click_blink(uint8_t led) {
 	led_set[led](1);
 	led_off_timer[led] = led_off_click_timer[led];
 }
+static void led_slow_blink(uint8_t led) {
+	led_set[led](1);
+	led_off_timer[led] = 100;
+}
 
 static void led_routine(void) {
 	for (uint8_t i = 0; i < 3; i++) {
@@ -288,9 +292,9 @@ void main(void) {
 	bluetooth_adv_start(false);
 	app_timer_start(sys_100hz_timer, APP_TIMER_TICKS(10), NULL);
 	buzzer_task_start(buzzer_task_plus, 1);
-	led_click_blink(0);
-	led_click_blink(1);
-	led_click_blink(2);
+	led_slow_blink(0);
+	led_slow_blink(1);
+	led_slow_blink(2);
 	for (;;) {
 		platform_scheduler();
 	}
