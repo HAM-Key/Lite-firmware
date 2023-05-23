@@ -4,5 +4,6 @@
 
 void bluetooth_init(void);
 void bluetooth_adv_start(bool);
+bool is_bt_connected(void);
 
 #endif

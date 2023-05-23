@@ -284,7 +284,9 @@ static uint8_t m_caps_off_key_scan_str[] = /**< Key pattern to be sent when the 
 	0x09,       /* Key f */
 };
 
-
+bool is_bt_connected(void) {
+	return (m_conn_handle != BLE_CONN_HANDLE_INVALID);
+}
 
 static void on_hids_evt(ble_hids_t* p_hids, ble_hids_evt_t* p_evt);
 
