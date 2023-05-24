@@ -11,7 +11,9 @@
 #include "app_timer.h"
 
 #ifdef CONFIG_NFCT_PINS_AS_GPIOS
-	volatile uint32_t UICR_ADDR_0x20C __attribute__((section("uicr_nfc"))) = 0xFFFFFFFE;
+	const uint32_t UICR_ADDR_0x20C __attribute__((section(".uicr_nfc_section"))) __attribute__((used)) = 0xFFFFFFFE;
+#else
+	const uint32_t UICR_ADDR_0x20C __attribute__((section(".uicr_nfc_section"))) __attribute__((used)) = 0xFFFFFFFF;
 #endif
 
 // TODO:
