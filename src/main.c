@@ -15,8 +15,8 @@
 #endif
 
 // TODO:
-// 电量检测
-// 低电状态红灯闪烁，不再闪点划灯
+//// [DONE] 电量检测
+//// [DONE] 低电状态红灯闪烁，不再闪点划灯
 //// [DONE] buzzer开关打开时，蓝牙连接则鸣响2次
 //// [DONE] 广播状态蓝灯闪烁不闪点划灯，连接状态蓝灯熄灭
 //// [DONE] 连接状态，识别到“点”闪红灯，识别到“划”闪蓝灯，发送字符闪白灯
@@ -27,6 +27,8 @@
 
 uint8_t batt_percent = 100;
 uint32_t batt_volt = 4200;
+
+static bool is_lowpower = false;
 
 #define BUZZER_ON() nrf_gpio_pin_clear(BUZZER_PIN)
 #define BUZZER_OFF() nrf_gpio_pin_set(BUZZER_PIN)
@@ -87,6 +89,9 @@ static void led_click_blink(uint8_t led) {
 	if(!is_bt_connected()) {
 		return;
 	}
+	if(is_lowpower) {
+		return;
+	}
 	led_set[led](1);
 	led_off_timer[led] = led_off_click_timer[led];
 }
@@ -117,6 +122,9 @@ uint8_t buzzer_task_counter = 0;
 uint8_t buzzer_task_p = 0;
 uint8_t buzzer_task_timer = 0;
 void buzzer_task_start(const uint8_t* task, uint8_t count) {
+	if(is_lowpower) {
+		return;
+	}
 	BUZZER_ON();
 	buzzer_task_p = 0;
 	buzzer_task_timer = task[0];
@@ -159,8 +167,11 @@ static void btn_buzzer_routine(void) {
 			if(buzzer_time >= 300) {
 				BUZZER_OFF();
 			} else {
-				BUZZER_ON();
 				buzzer_time += 1;
+				if(is_lowpower) {
+					return;
+				}
+				BUZZER_ON();
 			}
 		} else {
 			BUZZER_OFF();
@@ -290,6 +301,7 @@ static uint8_t batt_percent_convert(void) {
 extern void battery_level_update(uint8_t batt_level);
 static void func_routine(void) {
 	static uint8_t adc_tmr = 0;
+	static uint8_t lowpower_tmr = 0;
 	static uint8_t bt_adv_tmr = 0;
 	static bool old_bt_connected = false;
 	static uint8_t bt_connected_timer = 0;
@@ -297,8 +309,23 @@ static void func_routine(void) {
 	if(adc_tmr == 0) {
 		adc_start();
 		batt_percent = batt_percent_convert();
+		if(batt_percent < 15) {
+			is_lowpower = true;
+		} else if (batt_percent > 90) {
+			is_lowpower = false;
+		}
 		if(is_bt_connected()) {
 			battery_level_update(batt_percent);
+		}
+	}
+	if(is_lowpower || (lowpower_tmr != 0)) {
+		lowpower_tmr += 1;
+		if(lowpower_tmr == 90) {
+			led_set[0](1);
+		}
+		if(lowpower_tmr == 100) {
+			led_set[0](0);
+			lowpower_tmr = 0;
 		}
 	}
 	if(!is_bt_connected()) {
