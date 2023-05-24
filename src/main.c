@@ -26,7 +26,7 @@
 //// [DONE] buzzer开时，蜂鸣器跟随按键，蜂鸣器最多连续鸣响3秒
 //// [DONE] 15分钟无操作休眠, 按键唤醒
 // 长按3秒进入自拍杆模式，按键发送音量减。长按退出
-// 按住按键启动重置蓝牙
+//// [DONE] 按住按键启动重置蓝牙
 
 // 0xFF for unknown
 uint8_t batt_percent = 0xFF;
@@ -121,6 +121,7 @@ static void led_routine(void) {
 
 const uint8_t buzzer_task_dit[] = {8, 8, 0};
 const uint8_t buzzer_task_plus[] = {8, 8, 24, 8, 8, 8, 24, 8, 8, 0};
+const uint8_t buzzer_task_K[] = {24, 8, 8, 8, 24, 0};
 const uint8_t* buzzer_task = NULL;
 uint8_t buzzer_task_counter = 0;
 uint8_t buzzer_task_p = 0;
@@ -373,10 +374,15 @@ void main(void) {
 	LOG_RAW("RTT Started.\n");
 	uevt_bc_e(UEVT_SYS_SETUP);
 	NRF_LOG_INFO("HAMKey-Lite started.");
-	bluetooth_adv_start(false);
 	app_timer_start(sys_100hz_timer, APP_TIMER_TICKS(10), NULL);
-	if(nrf_gpio_pin_read(SW1_PIN) > 0) {
-		buzzer_task_start(buzzer_task_plus, 1);
+	if(nrf_gpio_pin_read(BUTTON_PIN) == 1) {
+		bluetooth_adv_start(true);
+		buzzer_task_start(buzzer_task_K, 1);
+	} else {
+		bluetooth_adv_start(false);
+		if(nrf_gpio_pin_read(SW1_PIN) > 0) {
+			buzzer_task_start(buzzer_task_plus, 1);
+		}
 	}
 	led_slow_blink(0);
 	led_slow_blink(1);
