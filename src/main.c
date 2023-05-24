@@ -28,7 +28,8 @@
 // 长按3秒进入自拍杆模式，按键发送音量减。长按退出
 // 按住按键启动重置蓝牙
 
-uint8_t batt_percent = 100;
+// 0xFF for unknown
+uint8_t batt_percent = 0xFF;
 uint32_t batt_volt = 4200;
 
 uint32_t idle_timer = 0;
@@ -289,19 +290,6 @@ static void btn_routine(void) {
 		}
 	}
 }
-static uint8_t batt_percent_convert(void) {
-	if(batt_volt > 4150) {
-		return 100;
-	}
-	if(batt_volt < 3550) {
-		return 0;
-	}
-	if(batt_volt > 3650) {
-		return (batt_volt - 3650) / 6 + 15;
-	} else {
-		return (batt_volt - 3550) / 7;
-	}
-}
 void shutdown_prepare(void) {
 	app_timer_stop_all();
 	BUZZER_OFF();
@@ -309,7 +297,6 @@ void shutdown_prepare(void) {
 	led_set[1](0);
 	led_set[2](0);
 }
-extern void battery_level_update(uint8_t batt_level);
 #define SHUTDOWN_COUNT (15*60*100)
 static void func_routine(void) {
 	static uint8_t adc_tmr = 0;
@@ -326,14 +313,10 @@ static void func_routine(void) {
 	adc_tmr += 1;
 	if(adc_tmr == 0) {
 		adc_start();
-		batt_percent = batt_percent_convert();
 		if(batt_percent < 15) {
 			is_lowpower = true;
 		} else if (batt_percent > 90) {
 			is_lowpower = false;
-		}
-		if(is_bt_connected()) {
-			battery_level_update(batt_percent);
 		}
 	}
 	if(is_lowpower || (lowpower_tmr != 0)) {
@@ -398,6 +381,7 @@ void main(void) {
 	led_slow_blink(0);
 	led_slow_blink(1);
 	led_slow_blink(2);
+
 	for (;;) {
 		platform_scheduler();
 	}

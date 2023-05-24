@@ -169,15 +169,53 @@ void switch_btn_config(void) {
 				 BUTTON_PULL,
 				 NRF_GPIO_PIN_S0S1,
 				 NRF_GPIO_PIN_NOSENSE);
+	nrf_gpio_cfg(CHARGING_PIN,
+				 NRF_GPIO_PIN_DIR_INPUT,
+				 NRF_GPIO_PIN_INPUT_CONNECT,
+				 NRF_GPIO_PIN_PULLUP,
+				 NRF_GPIO_PIN_S0S1,
+				 NRF_GPIO_PIN_NOSENSE);
 }
 
 extern uint32_t batt_volt;
+extern uint8_t batt_percent;
+static uint8_t batt_percent_convert(void) {
+	if(batt_volt > 4150) {
+		return 100;
+	}
+	if(batt_volt < 3550) {
+		return 0;
+	}
+	if(batt_volt > 3650) {
+		return (batt_volt - 3650) / 6 + 15;
+	} else {
+		return (batt_volt - 3550) / 7;
+	}
+}
+extern void battery_level_update(uint8_t batt_level);
 static nrf_saadc_value_t adc_buffer[8];
 static void saadc_event_handler(nrfx_saadc_evt_t const* p_evt) {
 	if (p_evt->type == NRFX_SAADC_EVT_DONE) {
 		int16_t adc_value = p_evt->data.done.p_buffer[0];
 		batt_volt = (3300 - (adc_value * 2 * 600 / 2048)) * 147 / 100;
 		NRF_LOG_INFO("ADC = %d, Volt = %d", adc_value, batt_volt);
+		uint8_t new_percent = batt_percent_convert();
+		if(batt_percent == 0xFF) {
+			batt_percent = new_percent;
+		} else {
+			if(nrf_gpio_pin_read(CHARGING_PIN) == 0) {
+				if(new_percent > batt_percent) {
+					batt_percent = new_percent;
+				}
+			} else {
+				if(new_percent < batt_percent) {
+					batt_percent = new_percent;
+				}
+			}
+		}
+		if(is_bt_connected()) {
+			battery_level_update(batt_percent);
+		}
 	}
 }
 
