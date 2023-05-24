@@ -25,6 +25,8 @@
 // 长按3秒进入自拍杆模式，按键发送音量减。长按退出
 // 按住按键启动重置蓝牙
 
+uint8_t batt_percent = 100;
+uint32_t batt_volt = 4200;
 
 #define BUZZER_ON() nrf_gpio_pin_clear(BUZZER_PIN)
 #define BUZZER_OFF() nrf_gpio_pin_set(BUZZER_PIN)
@@ -272,11 +274,33 @@ static void btn_routine(void) {
 		}
 	}
 }
-
+static uint8_t batt_percent_convert(void) {
+	if(batt_volt > 4150) {
+		return 100;
+	}
+	if(batt_volt < 3550) {
+		return 0;
+	}
+	if(batt_volt > 3650) {
+		return (batt_volt - 3650) / 6 + 15;
+	} else {
+		return (batt_volt - 3550) / 7;
+	}
+}
+extern void battery_level_update(uint8_t batt_level);
 static void func_routine(void) {
+	static uint8_t adc_tmr = 0;
 	static uint8_t bt_adv_tmr = 0;
 	static bool old_bt_connected = false;
 	static uint8_t bt_connected_timer = 0;
+	adc_tmr += 1;
+	if(adc_tmr == 0) {
+		adc_start();
+		batt_percent = batt_percent_convert();
+		if(is_bt_connected()) {
+			battery_level_update(batt_percent);
+		}
+	}
 	if(!is_bt_connected()) {
 		bt_connected_timer = 0;
 		old_bt_connected = false;
@@ -284,7 +308,6 @@ static void func_routine(void) {
 		if(bt_adv_tmr >= 100) {
 			bt_adv_tmr = 0;
 			led_blink(1, 7);
-			adc_start();
 		}
 	} else {
 		if(!old_bt_connected) {

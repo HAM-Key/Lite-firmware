@@ -171,11 +171,13 @@ void switch_btn_config(void) {
 				 NRF_GPIO_PIN_NOSENSE);
 }
 
+extern uint32_t batt_volt;
 static nrf_saadc_value_t adc_buffer[8];
 static void saadc_event_handler(nrfx_saadc_evt_t const* p_evt) {
 	if (p_evt->type == NRFX_SAADC_EVT_DONE) {
-		NRF_LOG_INFO("ADC = %d", p_evt->data.done.p_buffer[0]);
-		// volt = (adc*0.6/0.5/2048) + 3.3 v
+		int16_t adc_value = p_evt->data.done.p_buffer[0];
+		batt_volt = (3300 - (adc_value * 2 * 600 / 2048)) * 147 / 100;
+		NRF_LOG_INFO("ADC = %d, Volt = %d", adc_value, batt_volt);
 	}
 }
 
@@ -211,7 +213,6 @@ void adc_config(void) {
 void adc_start(void) {
 	uint32_t err_code;
 	if (!nrfx_saadc_is_busy()) {
-		LOG_RAW("adc_start\n");
 		err_code = nrfx_saadc_buffer_convert(adc_buffer, 1);
 		APP_ERROR_CHECK(err_code);
 		err_code = nrfx_saadc_sample();

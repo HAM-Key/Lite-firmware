@@ -439,13 +439,9 @@ static void ble_advertising_error_handler(uint32_t nrf_error) {
 
 /**@brief Function for performing a battery measurement, and update the Battery Level characteristic in the Battery Service.
  */
-static void battery_level_update(void) {
+void battery_level_update(uint8_t batt_level) {
 	ret_code_t err_code;
-	uint8_t  battery_level;
-
-	battery_level = (uint8_t)sensorsim_measure(&m_battery_sim_state, &m_battery_sim_cfg);
-
-	err_code = ble_bas_battery_level_update(&m_bas, battery_level, BLE_CONN_HANDLE_ALL);
+	err_code = ble_bas_battery_level_update(&m_bas, batt_level, BLE_CONN_HANDLE_ALL);
 	if ((err_code != NRF_SUCCESS) &&
 			(err_code != NRF_ERROR_BUSY) &&
 			(err_code != NRF_ERROR_RESOURCES) &&
