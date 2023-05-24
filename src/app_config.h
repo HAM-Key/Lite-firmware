@@ -97,8 +97,8 @@
 
 #define BUTTON_ENABLED 1
 
-#define SAADC_ENABLED 1
-// #define NRFX_SAADC_ENABLED 1
+#undef SAADC_ENABLED
+#define NRFX_SAADC_ENABLED 1
 
 #define FSTORAGE_ENABLED 1
 

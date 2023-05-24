@@ -26,7 +26,7 @@ NRF_LOG_MODULE_REGISTER();
 #include "nrf_drv_timer.h"
 #include "nrf_drv_spi.h"
 #include "nrf_drv_twi.h"
-#include "nrf_drv_saadc.h"
+#include "nrfx_saadc.h"
 
 #include "nrf_queue.h"
 #include "nrf_drv_rng.h"
@@ -171,98 +171,61 @@ void switch_btn_config(void) {
 				 NRF_GPIO_PIN_NOSENSE);
 }
 
-nrf_saadc_value_t adc_buffer[8];
-static void saadc_event_handler(nrf_drv_saadc_evt_t const* p_evt) {
-	static int16_t p_data[2];
-	if (p_evt->type == NRF_DRV_SAADC_EVT_DONE) {
-		int16_t voltY = 0;
-		int16_t voltX = 0;
-		voltY = p_evt->data.done.p_buffer[0];
-		voltX = p_evt->data.done.p_buffer[1];
-		p_data[0] = voltX;
-		p_data[1] = voltY;
-		uevt_bc(UEVT_ADC_NEWDATA, p_data);
-		LOG_RAW("x=%04d,y=%04d\r\n", voltX, voltY);
+static nrf_saadc_value_t adc_buffer[8];
+static void saadc_event_handler(nrfx_saadc_evt_t const* p_evt) {
+	if (p_evt->type == NRFX_SAADC_EVT_DONE) {
+		NRF_LOG_INFO("ADC = %d", p_evt->data.done.p_buffer[0]);
+		// volt = (adc*0.6/0.5/2048) + 3.3 v
 	}
 }
 
 void adc_config(void) {
 	uint32_t err_code;
 
-	nrf_drv_saadc_config_t saadc_config = {
+	nrfx_saadc_config_t saadc_config = {
 		.resolution         = (nrf_saadc_resolution_t)NRF_SAADC_RESOLUTION_12BIT,
 		.oversample         = (nrf_saadc_oversample_t)NRF_SAADC_OVERSAMPLE_DISABLED,
 		.interrupt_priority = NRFX_SAADC_CONFIG_IRQ_PRIORITY,
 		.low_power_mode     = 0
 	};
 
-	err_code = nrf_drv_saadc_init(&saadc_config, saadc_event_handler);
-	APP_ERROR_CHECK(err_code);
-
-	nrf_saadc_channel_config_t config0 = {
-		.resistor_p = NRF_SAADC_RESISTOR_DISABLED,
-		.resistor_n = NRF_SAADC_RESISTOR_DISABLED,
-		.gain       = NRF_SAADC_GAIN1,
-		.reference  = NRF_SAADC_REFERENCE_INTERNAL,
-		.acq_time   = NRF_SAADC_ACQTIME_15US,
-		.mode       = NRF_SAADC_MODE_DIFFERENTIAL,
-		.burst      = NRF_SAADC_BURST_ENABLED,
-		.pin_p      = NRF_SAADC_INPUT_AIN2,
-		.pin_n      = NRF_SAADC_INPUT_AIN3
-	};
-	err_code = nrf_drv_saadc_channel_init(0, &config0);
-	APP_ERROR_CHECK(err_code);
-
-	nrf_saadc_channel_config_t config1 = {
-		.resistor_p = NRF_SAADC_RESISTOR_DISABLED,
-		.resistor_n = NRF_SAADC_RESISTOR_DISABLED,
-		.gain       = NRF_SAADC_GAIN1_3,
-		.reference  = NRF_SAADC_REFERENCE_INTERNAL,
-		.acq_time   = NRF_SAADC_ACQTIME_15US,
-		.mode       = NRF_SAADC_MODE_SINGLE_ENDED,
-		.burst      = NRF_SAADC_BURST_ENABLED,
-		.pin_p      = NRF_SAADC_INPUT_AIN5,
-		.pin_n      = NRF_SAADC_INPUT_DISABLED
-	};
-	err_code = nrf_drv_saadc_channel_init(1, &config1);
+	err_code = nrfx_saadc_init(&saadc_config, saadc_event_handler);
 	APP_ERROR_CHECK(err_code);
 
 	// 差分电池电压检测145 = 4.2v, 460 = 3.7v
-	nrf_saadc_channel_config_t config2 = {
+	nrf_saadc_channel_config_t config = {
 		.resistor_p = NRF_SAADC_RESISTOR_DISABLED,
 		.resistor_n = NRF_SAADC_RESISTOR_DISABLED,
-		.gain       = NRF_SAADC_GAIN1,
+		.gain       = NRF_SAADC_GAIN1_2,
 		.reference  = NRF_SAADC_REFERENCE_INTERNAL,
-		.acq_time   = NRF_SAADC_ACQTIME_10US,
+		.acq_time   = NRF_SAADC_ACQTIME_20US,
 		.mode       = NRF_SAADC_MODE_DIFFERENTIAL,
 		.burst      = NRF_SAADC_BURST_ENABLED,
 		.pin_p      = NRF_SAADC_INPUT_AIN4,
 		.pin_n      = NRF_SAADC_INPUT_AIN6
 	};
-	err_code = nrf_drv_saadc_channel_init(2, &config2);
+	err_code = nrfx_saadc_channel_init(0, &config);
 	APP_ERROR_CHECK(err_code);
 }
 
 void adc_start(void) {
 	uint32_t err_code;
-
-	if (!nrf_drv_saadc_is_busy()) {
-		err_code = nrf_drv_saadc_buffer_convert(adc_buffer, 3);
+	if (!nrfx_saadc_is_busy()) {
+		LOG_RAW("adc_start\n");
+		err_code = nrfx_saadc_buffer_convert(adc_buffer, 1);
 		APP_ERROR_CHECK(err_code);
-
-		err_code = nrf_drv_saadc_sample();
+		err_code = nrfx_saadc_sample();
 		APP_ERROR_CHECK(err_code);
 	}
 }
 
-int16_t adc_get(uint8_t channel) {
-	// uint32_t err_code;
-	static nrf_saadc_value_t adc_value;
-	if (!nrf_drv_saadc_is_busy()) {
-		nrfx_saadc_sample_convert(channel, &adc_value);
-	}
-	return (int16_t)adc_value;
-}
+// int16_t adc_get(uint8_t channel) {
+// 	static nrf_saadc_value_t adc_value;
+// 	if (!nrfx_saadc_is_busy()) {
+// 		nrfx_saadc_sample_convert(channel, &adc_value);
+// 	}
+// 	return (int16_t)adc_value;
+// }
 
 void platform_init(void) {
 #if NRF_LOG_ENABLED==1
@@ -285,7 +248,7 @@ void platform_init(void) {
 	power_management_init();
 	leds_config();
 	switch_btn_config();
-	// adc_config();
+	adc_config();
 	bluetooth_init();
 
 #if MINIMAL_PERI_MODE==1

@@ -52,7 +52,7 @@ void platform_powerdown(bool flag);
 
 void adc_config(void);
 void adc_start(void);
-int16_t adc_get(uint8_t channel);
+// int16_t adc_get(uint8_t channel);
 
 void buzzer_set(bool v);
 void led_red_set(bool v);

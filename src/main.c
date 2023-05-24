@@ -284,6 +284,7 @@ static void func_routine(void) {
 		if(bt_adv_tmr >= 100) {
 			bt_adv_tmr = 0;
 			led_blink(1, 7);
+			adc_start();
 		}
 	} else {
 		if(!old_bt_connected) {
@@ -296,7 +297,6 @@ static void func_routine(void) {
 			}
 		}
 	}
-
 }
 
 APP_TIMER_DEF(sys_100hz_timer);
