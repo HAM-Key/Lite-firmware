@@ -35,31 +35,7 @@ uint32_t batt_volt = 4200;
 uint32_t idle_timer = 0;
 
 static bool is_lowpower = false;
-
 static bool is_buzzer_on = false;
-static void buzzer_switch_routine(void) {
-	static uint8_t buzzer_onoff = 0;
-	if(nrf_gpio_pin_read(SW1_PIN) > 0) {
-		if(buzzer_onoff < 50) {
-			buzzer_onoff += 1;
-			if(buzzer_onoff >= 50) {
-				LOG_RAW("BUZZER ON\n");
-				is_buzzer_on = true;
-			}
-		}
-	} else {
-		if(buzzer_onoff > 0) {
-			buzzer_onoff -= 1;
-			if(buzzer_onoff == 0) {
-				LOG_RAW("BUZZER OFF\n");
-				is_buzzer_on = false;
-				// TODO: 打断buzzer事件
-				BUZZER_OFF();
-			}
-		}
-	}
-}
-
 bool is_caps_on = false;
 static void caps_switch_routine(void) {
 	static uint8_t caps_onoff = 0;
@@ -181,6 +157,29 @@ static void btn_buzzer_routine(void) {
 		} else {
 			BUZZER_OFF();
 			buzzer_time = 0;
+		}
+	}
+}
+
+static void buzzer_switch_routine(void) {
+	static uint8_t buzzer_onoff = 0;
+	if(nrf_gpio_pin_read(SW1_PIN) > 0) {
+		if(buzzer_onoff < 50) {
+			buzzer_onoff += 1;
+			if(buzzer_onoff >= 50) {
+				LOG_RAW("BUZZER ON\n");
+				is_buzzer_on = true;
+			}
+		}
+	} else {
+		if(buzzer_onoff > 0) {
+			buzzer_onoff -= 1;
+			if(buzzer_onoff == 0) {
+				LOG_RAW("BUZZER OFF\n");
+				is_buzzer_on = false;
+				buzzer_task_counter = 0;
+				BUZZER_OFF();
+			}
 		}
 	}
 }
