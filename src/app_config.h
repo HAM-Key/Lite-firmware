@@ -12,7 +12,7 @@
 // <2=> Warning
 // <3=> Info
 // <4=> Debug
-#define NRF_LOG_DEFAULT_LEVEL 4
+#define NRF_LOG_DEFAULT_LEVEL 3
 
 #define NRF_LOG_MSGPOOL_ELEMENT_COUNT 32
 #define NRF_LOG_MSGPOOL_ELEMENT_SIZE 64
