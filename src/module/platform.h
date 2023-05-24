@@ -59,6 +59,9 @@ void led_red_set(bool v);
 void led_blue_set(bool v);
 void led_white_set(bool v);
 
+#define BUZZER_ON() nrf_gpio_pin_clear(BUZZER_PIN)
+#define BUZZER_OFF() nrf_gpio_pin_set(BUZZER_PIN)
+
 #define UEVT_SYS_BASE (0xAE00)
 // 上电信号
 #define UEVT_SYS_POWERUP (UEVT_SYS_BASE|0x01)

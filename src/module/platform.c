@@ -268,7 +268,10 @@ void platform_powerdown(bool flag) {
 	is_going_to_shutdown = flag;
 }
 
+extern void shutdown_prepare(void);
 void shutdown_routine(void) {
+	nrfx_saadc_uninit();
+	shutdown_prepare();
 	nrf_gpio_cfg_sense_set(BUTTON_PIN, BUTTON_SENSE);
 	nrf_pwr_mgmt_shutdown(NRF_PWR_MGMT_SHUTDOWN_GOTO_SYSOFF);
 	while(1);
