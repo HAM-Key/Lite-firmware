@@ -145,7 +145,7 @@ static void btn_buzzer_routine(void) {
 	static uint16_t buzzer_time = 0;
 	if(is_buzzer_on && buzzer_task_counter == 0) {
 		if(nrf_gpio_pin_read(BUTTON_PIN) == 1) {
-			if(buzzer_time >= 300) {
+			if(buzzer_time >= 100) {
 				BUZZER_OFF();
 			} else {
 				buzzer_time += 1;
