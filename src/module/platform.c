@@ -9,7 +9,6 @@ NRF_LOG_MODULE_REGISTER();
 #include "nrf_assert.h"
 #include "app_error.h"
 
-#include "app_button.h"
 #include "app_timer.h"
 
 #include "nrf_drv_rtc.h"

@@ -232,8 +232,6 @@ typedef struct {
 
 STATIC_ASSERT(sizeof(buffer_list_t) % 4 == 0);
 
-
-// APP_TIMER_DEF(m_battery_timer_id);                                  /**< Battery timer. */
 BLE_HIDS_DEF(m_hids,                                                /**< Structure used to identify the HID service. */
 			 NRF_SDH_BLE_TOTAL_LINK_COUNT,
 			 INPUT_REPORT_KEYS_MAX_LEN,
@@ -253,36 +251,6 @@ static pm_peer_id_t      m_peer_id;                                 /**< Device 
 static buffer_list_t     buffer_list;                               /**< List to enqueue not just data to be sent, but also related information like the handle, connection handle etc */
 
 static ble_uuid_t m_adv_uuids[] = {{BLE_UUID_HUMAN_INTERFACE_DEVICE_SERVICE, BLE_UUID_TYPE_BLE}};
-
-static uint8_t m_sample_key_press_scan_str[] = /**< Key pattern to be sent when the key press button has been pushed. */
-{
-	0x0b,       /* Key h */
-	0x08,       /* Key e */
-	0x0f,       /* Key l */
-	0x0f,       /* Key l */
-	0x12,       /* Key o */
-	0x28        /* Key Return */
-};
-
-static uint8_t m_caps_on_key_scan_str[] = /**< Key pattern to be sent when the output report has been written with the CAPS LOCK bit set. */
-{
-	0x06,       /* Key C */
-	0x04,       /* Key a */
-	0x13,       /* Key p */
-	0x16,       /* Key s */
-	0x12,       /* Key o */
-	0x11,       /* Key n */
-};
-
-static uint8_t m_caps_off_key_scan_str[] = /**< Key pattern to be sent when the output report has been written with the CAPS LOCK bit cleared. */
-{
-	0x06,       /* Key C */
-	0x04,       /* Key a */
-	0x13,       /* Key p */
-	0x16,       /* Key s */
-	0x12,       /* Key o */
-	0x09,       /* Key f */
-};
 
 bool is_bt_connected(void) {
 	return (m_conn_handle != BLE_CONN_HANDLE_INVALID);
@@ -304,27 +272,6 @@ static void on_hids_evt(ble_hids_t* p_hids, ble_hids_evt_t* p_evt);
 void assert_nrf_callback(uint16_t line_num, const uint8_t* p_file_name) {
 	app_error_handler(DEAD_BEEF, line_num, p_file_name);
 }
-
-
-/**@brief Function for setting filtered whitelist.
- *
- * @param[in] skip  Filter passed to @ref pm_peer_id_list.
- */
-// static void whitelist_set(pm_peer_id_list_skip_t skip) {
-// 	pm_peer_id_t peer_ids[BLE_GAP_WHITELIST_ADDR_MAX_COUNT];
-// 	uint32_t     peer_id_count = BLE_GAP_WHITELIST_ADDR_MAX_COUNT;
-
-// 	ret_code_t err_code = pm_peer_id_list(peer_ids, &peer_id_count, PM_PEER_ID_INVALID, skip);
-// 	APP_ERROR_CHECK(err_code);
-
-// 	NRF_LOG_INFO("\tm_whitelist_peer_cnt %d, MAX_PEERS_WLIST %d",
-// 				 peer_id_count + 1,
-// 				 BLE_GAP_WHITELIST_ADDR_MAX_COUNT);
-
-// 	err_code = pm_whitelist_set(peer_ids, peer_id_count);
-// 	APP_ERROR_CHECK(err_code);
-// }
-
 
 /**@brief Function for setting filtered device identities.
  *
@@ -361,7 +308,6 @@ static void advertising_start(bool erase_bonds) {
 		delete_bonds();
 		// Advertising is started by PM_EVT_PEERS_DELETE_SUCCEEDED event.
 	} else {
-		// whitelist_set(PM_PEER_ID_LIST_SKIP_NO_ID_ADDR);
 		ret_code_t ret = ble_advertising_start(&m_advertising, BLE_ADV_MODE_FAST);
 		APP_ERROR_CHECK(ret);
 	}
@@ -393,8 +339,6 @@ static void pm_evt_handler(pm_evt_t const* p_evt) {
 			if (p_evt->params.peer_data_update_succeeded.flash_changed
 					&& (p_evt->params.peer_data_update_succeeded.data_id == PM_PEER_DATA_ID_BONDING)) {
 				NRF_LOG_INFO("New Bond");
-				// Note: You should check on what kind of white list policy your application should use.
-				// whitelist_set(PM_PEER_ID_LIST_SKIP_NO_ID_ADDR);
 			}
 			break;
 
@@ -723,7 +667,6 @@ static void services_init(void) {
 	hids_init();
 }
 
-
 /**@brief Function for initializing the battery sensor simulator.
  */
 static void sensor_simulator_init(void) {
@@ -766,38 +709,6 @@ static void conn_params_init(void) {
 	APP_ERROR_CHECK(err_code);
 }
 
-
-/**@brief   Function for transmitting a key scan Press & Release Notification.
- *
- * @warning This handler is an example only. You need to analyze how you wish to send the key
- *          release.
- *
- * @param[in]  p_instance     Identifies the service for which Key Notifications are requested.
- * @param[in]  p_key_pattern  Pointer to key pattern.
- * @param[in]  pattern_len    Length of key pattern. 0 < pattern_len < 7.
- * @param[in]  pattern_offset Offset applied to Key Pattern for transmission.
- * @param[out] actual_len     Provides actual length of Key Pattern transmitted, making buffering of
- *                            rest possible if needed.
- * @return     NRF_SUCCESS on success, NRF_ERROR_RESOURCES in case transmission could not be
- *             completed due to lack of transmission buffer or other error codes indicating reason
- *             for failure.
- *
- * @note       In case of NRF_ERROR_RESOURCES, remaining pattern that could not be transmitted
- *             can be enqueued \ref buffer_enqueue function.
- *             In case a pattern of 'cofFEe' is the p_key_pattern, with pattern_len as 6 and
- *             pattern_offset as 0, the notifications as observed on the peer side would be
- *             1>    'c', 'o', 'f', 'F', 'E', 'e'
- *             2>    -  , 'o', 'f', 'F', 'E', 'e'
- *             3>    -  ,   -, 'f', 'F', 'E', 'e'
- *             4>    -  ,   -,   -, 'F', 'E', 'e'
- *             5>    -  ,   -,   -,   -, 'E', 'e'
- *             6>    -  ,   -,   -,   -,   -, 'e'
- *             7>    -  ,   -,   -,   -,   -,  -
- *             Here, '-' refers to release, 'c' refers to the key character being transmitted.
- *             Therefore 7 notifications will be sent.
- *             In case an offset of 4 was provided, the pattern notifications sent will be from 5-7
- *             will be transmitted.
- */
 bool send_shift = false;
 uint8_t modifier_key_send = 0;
 static uint32_t send_key_scan_press_release(ble_hids_t* p_hids,
@@ -1057,19 +968,9 @@ static void on_hid_rep_char_write(ble_hids_evt_t* p_evt) {
 			if (!m_caps_on && ((report_val & OUTPUT_REPORT_BIT_MASK_CAPS_LOCK) != 0)) {
 				// Caps Lock is turned On.
 				NRF_LOG_INFO("Caps Lock is turned On!");
-				// err_code = bsp_indication_set(BSP_INDICATE_ALERT_3);
-				// APP_ERROR_CHECK(err_code);
-
-				keys_send(sizeof(m_caps_on_key_scan_str), m_caps_on_key_scan_str);
-				m_caps_on = true;
 			} else if (m_caps_on && ((report_val & OUTPUT_REPORT_BIT_MASK_CAPS_LOCK) == 0)) {
 				// Caps Lock is turned Off .
 				NRF_LOG_INFO("Caps Lock is turned Off!");
-				// err_code = bsp_indication_set(BSP_INDICATE_ALERT_OFF);
-				// APP_ERROR_CHECK(err_code);
-
-				keys_send(sizeof(m_caps_off_key_scan_str), m_caps_off_key_scan_str);
-				m_caps_on = false;
 			} else {
 				// The report received is not supported by this application. Do nothing.
 			}
@@ -1084,13 +985,6 @@ static void on_hid_rep_char_write(ble_hids_evt_t* p_evt) {
  */
 static void sleep_mode_enter(void) {
 	ret_code_t err_code;
-
-	// err_code = bsp_indication_set(BSP_INDICATE_IDLE);
-	// APP_ERROR_CHECK(err_code);
-
-	// Prepare wakeup buttons.
-	// err_code = bsp_btn_ble_sleep_mode_prepare();
-	// APP_ERROR_CHECK(err_code);
 
 	// Go to system-off mode (this function will not return; wakeup will cause a reset).
 	err_code = sd_power_system_off();
@@ -1143,38 +1037,26 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
 	switch (ble_adv_evt) {
 		case BLE_ADV_EVT_DIRECTED_HIGH_DUTY:
 			NRF_LOG_INFO("High Duty Directed advertising.");
-			// err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_DIRECTED);
-			// APP_ERROR_CHECK(err_code);
 			break;
 
 		case BLE_ADV_EVT_DIRECTED:
 			NRF_LOG_INFO("Directed advertising.");
-			// err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_DIRECTED);
-			// APP_ERROR_CHECK(err_code);
 			break;
 
 		case BLE_ADV_EVT_FAST:
 			NRF_LOG_INFO("Fast advertising.");
-			// err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
-			// APP_ERROR_CHECK(err_code);
 			break;
 
 		case BLE_ADV_EVT_SLOW:
 			NRF_LOG_INFO("Slow advertising.");
-			// err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_SLOW);
-			// APP_ERROR_CHECK(err_code);
 			break;
 
 		case BLE_ADV_EVT_FAST_WHITELIST:
 			NRF_LOG_INFO("Fast advertising with whitelist.");
-			// err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_WHITELIST);
-			// APP_ERROR_CHECK(err_code);
 			break;
 
 		case BLE_ADV_EVT_SLOW_WHITELIST:
 			NRF_LOG_INFO("Slow advertising with whitelist.");
-			// err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING_WHITELIST);
-			// APP_ERROR_CHECK(err_code);
 			break;
 
 		case BLE_ADV_EVT_IDLE:
@@ -1444,20 +1326,6 @@ static void power_management_init(void) {
 	APP_ERROR_CHECK(err_code);
 }
 
-
-/**@brief Function for handling the idle state (main loop).
- *
- * @details If there is no pending log operation, then sleep until next the next event occurs.
- */
-static void idle_state_handle(void) {
-	app_sched_execute();
-	if (NRF_LOG_PROCESS() == false) {
-		// if(is_going_to_shutdown) {
-		// 	shutdown_routine();
-		// }
-		nrf_pwr_mgmt_run();
-	}
-}
 void bluetooth_adv_start(bool b) {
 	advertising_start(b);
 }

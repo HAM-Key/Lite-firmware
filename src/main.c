@@ -16,18 +16,6 @@
 	const uint32_t UICR_ADDR_0x20C __attribute__((section(".uicr_nfc_section"))) __attribute__((used)) = 0xFFFFFFFF;
 #endif
 
-// TODO:
-//// [DONE] 电量检测
-//// [DONE] 低电状态红灯闪烁，不再闪点划灯
-//// [DONE] buzzer开关打开时，蓝牙连接则鸣响2次
-//// [DONE] 广播状态蓝灯闪烁不闪点划灯，连接状态蓝灯熄灭
-//// [DONE] 连接状态，识别到“点”闪红灯，识别到“划”闪蓝灯，发送字符闪白灯
-//// [DONE] 开机或唤醒，蜂鸣器鸣响加号摩斯码
-//// [DONE] buzzer开时，蜂鸣器跟随按键，蜂鸣器最多连续鸣响3秒
-//// [DONE] 15分钟无操作休眠, 按键唤醒
-//// [DONE] 长按2秒进入办公模式，短按发送ctrl+v 长按发送ctrl+c, 长按2秒退出
-//// [DONE] 按住按键启动重置蓝牙
-
 // 0xFF for unknown
 uint8_t batt_percent = 0xFF;
 uint32_t batt_volt = 4200;
