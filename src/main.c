@@ -25,40 +25,18 @@
 //// [DONE] 开机或唤醒，蜂鸣器鸣响加号摩斯码
 //// [DONE] buzzer开时，蜂鸣器跟随按键，蜂鸣器最多连续鸣响3秒
 //// [DONE] 15分钟无操作休眠, 按键唤醒
-// 长按3秒进入自拍杆模式，按键发送音量减。长按退出
-// 按住按键启动重置蓝牙
+//// [DONE] 长按2秒进入办公模式，短按发送ctrl+v 长按发送ctrl+c, 长按2秒退出
+//// [DONE] 按住按键启动重置蓝牙
 
-uint8_t batt_percent = 100;
+// 0xFF for unknown
+uint8_t batt_percent = 0xFF;
 uint32_t batt_volt = 4200;
 
 uint32_t idle_timer = 0;
 
+static bool is_office_mode = false;
 static bool is_lowpower = false;
-
 static bool is_buzzer_on = false;
-static void buzzer_switch_routine(void) {
-	static uint8_t buzzer_onoff = 0;
-	if(nrf_gpio_pin_read(SW1_PIN) > 0) {
-		if(buzzer_onoff < 50) {
-			buzzer_onoff += 1;
-			if(buzzer_onoff >= 50) {
-				LOG_RAW("BUZZER ON\n");
-				is_buzzer_on = true;
-			}
-		}
-	} else {
-		if(buzzer_onoff > 0) {
-			buzzer_onoff -= 1;
-			if(buzzer_onoff == 0) {
-				LOG_RAW("BUZZER OFF\n");
-				is_buzzer_on = false;
-				// TODO: 打断buzzer事件
-				BUZZER_OFF();
-			}
-		}
-	}
-}
-
 bool is_caps_on = false;
 static void caps_switch_routine(void) {
 	static uint8_t caps_onoff = 0;
@@ -120,6 +98,7 @@ static void led_routine(void) {
 
 const uint8_t buzzer_task_dit[] = {8, 8, 0};
 const uint8_t buzzer_task_plus[] = {8, 8, 24, 8, 8, 8, 24, 8, 8, 0};
+const uint8_t buzzer_task_K[] = {24, 8, 8, 8, 24, 0};
 const uint8_t* buzzer_task = NULL;
 uint8_t buzzer_task_counter = 0;
 uint8_t buzzer_task_p = 0;
@@ -167,7 +146,7 @@ static void btn_buzzer_routine(void) {
 	static uint16_t buzzer_time = 0;
 	if(is_buzzer_on && buzzer_task_counter == 0) {
 		if(nrf_gpio_pin_read(BUTTON_PIN) == 1) {
-			if(buzzer_time >= 300) {
+			if(buzzer_time >= 100) {
 				BUZZER_OFF();
 			} else {
 				buzzer_time += 1;
@@ -179,6 +158,29 @@ static void btn_buzzer_routine(void) {
 		} else {
 			BUZZER_OFF();
 			buzzer_time = 0;
+		}
+	}
+}
+
+static void buzzer_switch_routine(void) {
+	static uint8_t buzzer_onoff = 0;
+	if(nrf_gpio_pin_read(SW1_PIN) > 0) {
+		if(buzzer_onoff < 50) {
+			buzzer_onoff += 1;
+			if(buzzer_onoff >= 50) {
+				LOG_RAW("BUZZER ON\n");
+				is_buzzer_on = true;
+			}
+		}
+	} else {
+		if(buzzer_onoff > 0) {
+			buzzer_onoff -= 1;
+			if(buzzer_onoff == 0) {
+				LOG_RAW("BUZZER OFF\n");
+				is_buzzer_on = false;
+				buzzer_task_counter = 0;
+				BUZZER_OFF();
+			}
 		}
 	}
 }
@@ -218,8 +220,8 @@ static void dida_push(uint8_t time) {
 		dida_idle_timer = 50;
 	}
 }
-extern void char_send(uint8_t character);
-extern void str_send(uint8_t* str, uint8_t len);
+extern void char_send(uint8_t character, uint8_t mod);
+extern void str_send(uint8_t* str, uint8_t len, uint8_t mod);
 static void dida_parse(void) {
 	if(dida_depth <= 9) {
 		for (uint8_t i = 0; i < dida_depth; i++) {
@@ -227,17 +229,12 @@ static void dida_parse(void) {
 		}
 		LOG_RAW("\n");
 		for (uint8_t i = 0; i < dida_depth; i++) {
-			if(dida_cache[i] <= BASE_TIME + 1) {
-				LOG_RAW(".")
-			} else if(dida_cache[i] >= BASE_TIME * 2.5 && dida_cache[i] <= BASE_TIME * 3.5) {
-				LOG_RAW("_")
-			} else {
-				LOG_RAW("|", dida_cache[i]);
-			}
 			if(dida_cache[i] <= BASE_TIME * 1.5) {
 				valid_cache[i] = 0;
+				LOG_RAW(".");
 			} else if(dida_cache[i] >= BASE_TIME * 2 && dida_cache[i] <= BASE_TIME * 3.5) {
 				valid_cache[i] = 1;
+				LOG_RAW("_");
 			} else {
 				valid_cache[i] = 0xFF;
 				break;
@@ -245,12 +242,31 @@ static void dida_parse(void) {
 		}
 		uint8_t send_code = morse_code_parse(valid_cache, dida_depth);
 		if(send_code == 0xFE) {
-			static uint8_t sos[2] = {KEY_S, KEY_O};
-			str_send(sos, 2);
-			char_send(KEY_S);
+			uint8_t mod;
+			if(is_caps_on) {
+				mod = KEY_MOD_LSHIFT;
+			} else {
+				mod = 0;
+			}
+			char_send(KEY_S, mod);
+			char_send(KEY_O, mod);
+			char_send(KEY_S, mod);
+			if(mod) {
+				char_send(KEY_NONE, 0);
+			}
 		} else if(send_code != 0xFF) {
 			led_click_blink(2);
-			char_send(send_code);
+			LOG_RAW("SEND CODE [%02X]\n", send_code);
+			uint8_t mod;
+			if(is_caps_on && send_code <= KEY_Z) {
+				mod = KEY_MOD_LSHIFT;
+			} else {
+				mod = 0;
+			}
+			char_send(send_code, mod);
+			if(mod) {
+				char_send(KEY_NONE, 0);
+			}
 			if(send_code == KEY_ENTER) {
 				// no space after enter key
 				dida_idle_timer = 0;
@@ -261,45 +277,72 @@ static void dida_parse(void) {
 	dida_depth = 0;
 }
 
-static void btn_routine(void) {
-	static uint8_t current_btn_time = 0;
-	if(nrf_gpio_pin_read(BUTTON_PIN) == 1) {
-		idle_timer = 0;
-		if(current_btn_time < 100) {
-			current_btn_time += 1;
+static uint16_t current_btn_time = 0;
+static void office_mode_btn_press(uint16_t t) {
+	if(t >= 200 || (t == 0)) {
+		return;
+	}
+	if(t < 12) {
+		LOG_RAW("SEND PASTE\n");
+		led_click_blink(0);
+		char_send(KEY_V, KEY_MOD_LCTRL);
+		char_send(KEY_NONE, 0);
+	} else if(t < 50) {
+		LOG_RAW("SEND COPY\n");
+		led_click_blink(1);
+		char_send(KEY_C, KEY_MOD_LCTRL);
+		char_send(KEY_NONE, 0);
+	}
+}
+static void morse_mode_btn_press(uint16_t t) {
+	if(t >= 200) {
+		return;
+	}
+	if(t > 0 && t < 50) {
+		if(t <= BASE_TIME * 1.5) {
+			led_click_blink(0);
+		} else if(t >= BASE_TIME * 2 && t <= BASE_TIME * 3.5) {
+			led_click_blink(1);
 		}
-	} else {
-		if(current_btn_time > 0 && current_btn_time < 50) {
-			if(current_btn_time <= BASE_TIME * 1.5) {
-				led_click_blink(0);
-			} else if(current_btn_time >= BASE_TIME * 2 && current_btn_time <= BASE_TIME * 3.5) {
-				led_click_blink(1);
-			}
-			dida_push(current_btn_time);
-			current_btn_time = 0;
+		dida_push(t);
+	}
+	if(dida_idle_timer > 0) {
+		dida_idle_timer -= 1;
+		if(dida_idle_timer == 29) {
+			dida_parse();
 		}
-		if(dida_idle_timer > 0) {
-			dida_idle_timer -= 1;
-			if(dida_idle_timer == 29) {
-				dida_parse();
-			}
-			if(dida_idle_timer == 1) {
-				char_send(KEY_SPACE);
-			}
+		if(dida_idle_timer == 1) {
+			char_send(KEY_SPACE, 0);
 		}
 	}
 }
-static uint8_t batt_percent_convert(void) {
-	if(batt_volt > 4150) {
-		return 100;
-	}
-	if(batt_volt < 3550) {
-		return 0;
-	}
-	if(batt_volt > 3650) {
-		return (batt_volt - 3650) / 6 + 15;
+static void btn_routine(void) {
+	if(nrf_gpio_pin_read(BUTTON_PIN) == 1) {
+		idle_timer = 0;
+		if(current_btn_time < 200) {
+			current_btn_time += 1;
+			if(current_btn_time == 200) {
+				is_office_mode = !is_office_mode;
+				if(is_office_mode) {
+					led_blink(2, 100);
+					if(is_buzzer_on) {
+						buzzer_task_start(buzzer_task_dit, 3);
+					}
+				} else {
+					led_blink(1, 100);
+					if(is_buzzer_on) {
+						buzzer_task_start(buzzer_task_dit, 2);
+					}
+				}
+			}
+		}
 	} else {
-		return (batt_volt - 3550) / 7;
+		if(is_office_mode) {
+			office_mode_btn_press(current_btn_time);
+		} else {
+			morse_mode_btn_press(current_btn_time);
+		}
+		current_btn_time = 0;
 	}
 }
 void shutdown_prepare(void) {
@@ -309,7 +352,6 @@ void shutdown_prepare(void) {
 	led_set[1](0);
 	led_set[2](0);
 }
-extern void battery_level_update(uint8_t batt_level);
 #define SHUTDOWN_COUNT (15*60*100)
 static void func_routine(void) {
 	static uint8_t adc_tmr = 0;
@@ -326,14 +368,10 @@ static void func_routine(void) {
 	adc_tmr += 1;
 	if(adc_tmr == 0) {
 		adc_start();
-		batt_percent = batt_percent_convert();
 		if(batt_percent < 15) {
 			is_lowpower = true;
 		} else if (batt_percent > 90) {
 			is_lowpower = false;
-		}
-		if(is_bt_connected()) {
-			battery_level_update(batt_percent);
 		}
 	}
 	if(is_lowpower || (lowpower_tmr != 0)) {
@@ -390,14 +428,20 @@ void main(void) {
 	LOG_RAW("RTT Started.\n");
 	uevt_bc_e(UEVT_SYS_SETUP);
 	NRF_LOG_INFO("HAMKey-Lite started.");
-	bluetooth_adv_start(false);
 	app_timer_start(sys_100hz_timer, APP_TIMER_TICKS(10), NULL);
-	if(nrf_gpio_pin_read(SW1_PIN) > 0) {
-		buzzer_task_start(buzzer_task_plus, 1);
+	if(nrf_gpio_pin_read(BUTTON_PIN) == 1) {
+		bluetooth_adv_start(true);
+		buzzer_task_start(buzzer_task_K, 1);
+	} else {
+		bluetooth_adv_start(false);
+		if(nrf_gpio_pin_read(SW1_PIN) > 0) {
+			buzzer_task_start(buzzer_task_plus, 1);
+		}
 	}
 	led_slow_blink(0);
 	led_slow_blink(1);
 	led_slow_blink(2);
+
 	for (;;) {
 		platform_scheduler();
 	}

@@ -34,6 +34,7 @@ void LOG_HEX_RAW_IMP(const uint8_t* array, uint16_t length);
 #define SW2_PIN (14)
 
 #define BUTTON_PIN (6)
+#define CHARGING_PIN (18)
 
 #define BUTTON_POL (NRF_GPIOTE_POLARITY_LOTOHI)
 #define BUTTON_PULL (nrf_gpio_pin_pull_t)(BUTTON_POL*2-1)
