@@ -25,7 +25,7 @@
 //// [DONE] 开机或唤醒，蜂鸣器鸣响加号摩斯码
 //// [DONE] buzzer开时，蜂鸣器跟随按键，蜂鸣器最多连续鸣响3秒
 //// [DONE] 15分钟无操作休眠, 按键唤醒
-// 长按3秒进入自拍杆模式，按键发送音量减。长按退出
+//// [DONE] 长按2秒进入办公模式，短按发送ctrl+v 长按发送ctrl+c, 长按2秒退出
 //// [DONE] 按住按键启动重置蓝牙
 
 // 0xFF for unknown
@@ -34,6 +34,7 @@ uint32_t batt_volt = 4200;
 
 uint32_t idle_timer = 0;
 
+static bool is_office_mode = false;
 static bool is_lowpower = false;
 static bool is_buzzer_on = false;
 bool is_caps_on = false;
@@ -219,8 +220,8 @@ static void dida_push(uint8_t time) {
 		dida_idle_timer = 50;
 	}
 }
-extern void char_send(uint8_t character);
-extern void str_send(uint8_t* str, uint8_t len);
+extern void char_send(uint8_t character, uint8_t mod);
+extern void str_send(uint8_t* str, uint8_t len, uint8_t mod);
 static void dida_parse(void) {
 	if(dida_depth <= 9) {
 		for (uint8_t i = 0; i < dida_depth; i++) {
@@ -228,17 +229,12 @@ static void dida_parse(void) {
 		}
 		LOG_RAW("\n");
 		for (uint8_t i = 0; i < dida_depth; i++) {
-			if(dida_cache[i] <= BASE_TIME + 1) {
-				LOG_RAW(".")
-			} else if(dida_cache[i] >= BASE_TIME * 2.5 && dida_cache[i] <= BASE_TIME * 3.5) {
-				LOG_RAW("_")
-			} else {
-				LOG_RAW("|", dida_cache[i]);
-			}
 			if(dida_cache[i] <= BASE_TIME * 1.5) {
 				valid_cache[i] = 0;
+				LOG_RAW(".");
 			} else if(dida_cache[i] >= BASE_TIME * 2 && dida_cache[i] <= BASE_TIME * 3.5) {
 				valid_cache[i] = 1;
+				LOG_RAW("_");
 			} else {
 				valid_cache[i] = 0xFF;
 				break;
@@ -246,12 +242,31 @@ static void dida_parse(void) {
 		}
 		uint8_t send_code = morse_code_parse(valid_cache, dida_depth);
 		if(send_code == 0xFE) {
-			static uint8_t sos[2] = {KEY_S, KEY_O};
-			str_send(sos, 2);
-			char_send(KEY_S);
+			uint8_t mod;
+			if(is_caps_on) {
+				mod = KEY_MOD_LSHIFT;
+			} else {
+				mod = 0;
+			}
+			char_send(KEY_S, mod);
+			char_send(KEY_O, mod);
+			char_send(KEY_S, mod);
+			if(mod) {
+				char_send(KEY_NONE, 0);
+			}
 		} else if(send_code != 0xFF) {
 			led_click_blink(2);
-			char_send(send_code);
+			LOG_RAW("SEND CODE [%02X]\n", send_code);
+			uint8_t mod;
+			if(is_caps_on && send_code <= KEY_Z) {
+				mod = KEY_MOD_LSHIFT;
+			} else {
+				mod = 0;
+			}
+			char_send(send_code, mod);
+			if(mod) {
+				char_send(KEY_NONE, 0);
+			}
 			if(send_code == KEY_ENTER) {
 				// no space after enter key
 				dida_idle_timer = 0;
@@ -262,32 +277,72 @@ static void dida_parse(void) {
 	dida_depth = 0;
 }
 
+static uint16_t current_btn_time = 0;
+static void office_mode_btn_press(uint16_t t) {
+	if(t >= 200 || (t == 0)) {
+		return;
+	}
+	if(t < 12) {
+		LOG_RAW("SEND PASTE\n");
+		led_click_blink(0);
+		char_send(KEY_V, KEY_MOD_LCTRL);
+		char_send(KEY_NONE, 0);
+	} else if(t < 50) {
+		LOG_RAW("SEND COPY\n");
+		led_click_blink(1);
+		char_send(KEY_C, KEY_MOD_LCTRL);
+		char_send(KEY_NONE, 0);
+	}
+}
+static void morse_mode_btn_press(uint16_t t) {
+	if(t >= 200) {
+		return;
+	}
+	if(t > 0 && t < 50) {
+		if(t <= BASE_TIME * 1.5) {
+			led_click_blink(0);
+		} else if(t >= BASE_TIME * 2 && t <= BASE_TIME * 3.5) {
+			led_click_blink(1);
+		}
+		dida_push(t);
+	}
+	if(dida_idle_timer > 0) {
+		dida_idle_timer -= 1;
+		if(dida_idle_timer == 29) {
+			dida_parse();
+		}
+		if(dida_idle_timer == 1) {
+			char_send(KEY_SPACE, 0);
+		}
+	}
+}
 static void btn_routine(void) {
-	static uint8_t current_btn_time = 0;
 	if(nrf_gpio_pin_read(BUTTON_PIN) == 1) {
 		idle_timer = 0;
-		if(current_btn_time < 100) {
+		if(current_btn_time < 200) {
 			current_btn_time += 1;
+			if(current_btn_time == 200) {
+				is_office_mode = !is_office_mode;
+				if(is_office_mode) {
+					led_blink(2, 100);
+					if(is_buzzer_on) {
+						buzzer_task_start(buzzer_task_dit, 3);
+					}
+				} else {
+					led_blink(1, 100);
+					if(is_buzzer_on) {
+						buzzer_task_start(buzzer_task_dit, 2);
+					}
+				}
+			}
 		}
 	} else {
-		if(current_btn_time > 0 && current_btn_time < 50) {
-			if(current_btn_time <= BASE_TIME * 1.5) {
-				led_click_blink(0);
-			} else if(current_btn_time >= BASE_TIME * 2 && current_btn_time <= BASE_TIME * 3.5) {
-				led_click_blink(1);
-			}
-			dida_push(current_btn_time);
-			current_btn_time = 0;
+		if(is_office_mode) {
+			office_mode_btn_press(current_btn_time);
+		} else {
+			morse_mode_btn_press(current_btn_time);
 		}
-		if(dida_idle_timer > 0) {
-			dida_idle_timer -= 1;
-			if(dida_idle_timer == 29) {
-				dida_parse();
-			}
-			if(dida_idle_timer == 1) {
-				char_send(KEY_SPACE);
-			}
-		}
+		current_btn_time = 0;
 	}
 }
 void shutdown_prepare(void) {

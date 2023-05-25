@@ -166,7 +166,8 @@
 
 #define BASE_USB_HID_SPEC_VERSION           0x0101                                     /**< Version number of base USB HID Specification implemented by this application. */
 
-#define INPUT_REPORT_KEYS_MAX_LEN           8                                          /**< Maximum length of the Input Report characteristic. */
+#define HID_KEY_ARRAY_LENGTH (3)
+#define INPUT_REPORT_KEYS_MAX_LEN           HID_KEY_ARRAY_LENGTH+2                                          /**< Maximum length of the Input Report characteristic. */
 
 #define DEAD_BEEF                           0xDEADBEEF                                 /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
@@ -179,7 +180,6 @@
 
 #define MODIFIER_KEY_POS                    0                                          /**< Position of the modifier byte in the Input Report. */
 #define SCAN_CODE_POS                       2                                          /**< The start position of the key scan code in a HID Report. */
-#define SHIFT_KEY_CODE                      0x02                                       /**< Key code indicating the press of the Shift Key. */
 
 #define MAX_KEYS_IN_ONE_REPORT              (INPUT_REPORT_KEYS_MAX_LEN - SCAN_CODE_POS)/**< Maximum number of key presses that can be sent in one Input Report. */
 
@@ -584,7 +584,7 @@ static void bas_init(void) {
 	APP_ERROR_CHECK(err_code);
 }
 
-
+#include "usb_hid_keys.h"
 /**@brief Function for initializing HID Service.
  */
 static void hids_init(void) {
@@ -625,13 +625,13 @@ static void hids_init(void) {
 		0x75, 0x03,       // Report Size (3)
 		0x91, 0x01,       // Output (Data, Variable, Absolute), Led report padding
 
-		0x95, 0x06,       // Report Count (6)
+		0x95, HID_KEY_ARRAY_LENGTH,       // Report Count (6)
 		0x75, 0x08,       // Report Size (8)
 		0x15, 0x00,       // Logical Minimum (0)
-		0x25, 0x65,       // Logical Maximum (101)
+		0x25, KEY_MEDIA_CALC,       // Logical Maximum (101)
 		0x05, 0x07,       // Usage Page (Key codes)
 		0x19, 0x00,       // Usage Minimum (0)
-		0x29, 0x65,       // Usage Maximum (101)
+		0x29, KEY_MEDIA_CALC,       // Usage Maximum (101)
 		0x81, 0x00,       // Input (Data, Array) Key array(6 bytes)
 
 		0x09, 0x05,       // Usage (Vendor Defined)
@@ -641,7 +641,7 @@ static void hids_init(void) {
 		0x95, 0x02,       // Report Count (2)
 		0xB1, 0x02,       // Feature (Data, Variable, Absolute)
 
-		0xC0              // End Collection (Application)
+		0xC0,              // End Collection (Application)
 	};
 
 	memset((void*)input_report_array, 0, sizeof(ble_hids_inp_rep_init_t));
@@ -798,7 +798,8 @@ static void conn_params_init(void) {
  *             In case an offset of 4 was provided, the pattern notifications sent will be from 5-7
  *             will be transmitted.
  */
-extern bool is_caps_on;
+bool send_shift = false;
+uint8_t modifier_key_send = 0;
 static uint32_t send_key_scan_press_release(ble_hids_t* p_hids,
 		uint8_t*     p_key_pattern,
 		uint16_t     pattern_len,
@@ -811,7 +812,7 @@ static uint32_t send_key_scan_press_release(ble_hids_t* p_hids,
 
 	// HID Report Descriptor enumerates an array of size 6, the pattern hence shall not be any
 	// longer than this.
-	STATIC_ASSERT((INPUT_REPORT_KEYS_MAX_LEN - 2) == 6);
+	STATIC_ASSERT((INPUT_REPORT_KEYS_MAX_LEN - 2) == HID_KEY_ARRAY_LENGTH);
 
 	ASSERT(pattern_len <= (INPUT_REPORT_KEYS_MAX_LEN - 2));
 
@@ -825,9 +826,7 @@ static uint32_t send_key_scan_press_release(ble_hids_t* p_hids,
 		// Copy the scan code.
 		memcpy(data + SCAN_CODE_POS + offset, p_key_pattern + offset, data_len - offset);
 
-		if (is_caps_on) {
-			data[MODIFIER_KEY_POS] |= SHIFT_KEY_CODE;
-		}
+		data[MODIFIER_KEY_POS] |= modifier_key_send;
 
 		if (!m_in_boot_mode) {
 			err_code = ble_hids_inp_rep_send(p_hids,
@@ -1010,15 +1009,24 @@ static void keys_send(uint8_t key_pattern_len, uint8_t* p_key_pattern) {
 	}
 }
 
-void str_send(uint8_t* str, uint8_t len) {
+extern bool is_caps_on;
+void str_send(uint8_t* str, uint8_t len, uint8_t modkey) {
 	if(m_conn_handle != BLE_CONN_HANDLE_INVALID) {
+		modifier_key_send = modkey;
 		keys_send(len, str);
 	}
 }
-void char_send(uint8_t character) {
+void char_send(uint8_t character, uint8_t modkey) {
 	static uint8_t c = 0;
 	c = character;
+	modifier_key_send = modkey;
 	if(m_conn_handle != BLE_CONN_HANDLE_INVALID) {
+		send_shift = false;
+		if(is_caps_on) {
+			if(character <= KEY_Z) {
+				send_shift = true;
+			}
+		}
 		keys_send(1, &c);
 	}
 }
