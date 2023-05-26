@@ -217,10 +217,10 @@ static void dida_parse(void) {
 		}
 		LOG_RAW("\n");
 		for (uint8_t i = 0; i < dida_depth; i++) {
-			if(dida_cache[i] <= BASE_TIME * 1.5) {
+			if(dida_cache[i] <= BASE_TIME * 1.5 && dida_cache[i] > BASE_TIME / 2) {
 				valid_cache[i] = 0;
 				LOG_RAW(".");
-			} else if(dida_cache[i] >= BASE_TIME * 2 && dida_cache[i] <= BASE_TIME * 3.5) {
+			} else if(dida_cache[i] >= BASE_TIME * 2 && dida_cache[i] <= BASE_TIME * 4) {
 				valid_cache[i] = 1;
 				LOG_RAW("_");
 			} else {
