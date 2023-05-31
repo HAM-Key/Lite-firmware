@@ -2,7 +2,7 @@
 
 `HAMKey`是一个与摩斯码密切相关的键盘项目。旨在为业余无线电爱好者和对摩斯码感兴趣的人群提供一个便利的输入外设。
 
-本仓库为`HAMKey-Lite`的固件仓库。
+本分支为`HAMKey-Lite`的固件仓库。
 
 ## 编译与烧录
 
@@ -27,9 +27,9 @@
 
 ## 功能说明
 
-本键盘有物理开关`3`个，物理按键`1`个，Type-C充电接口`1`个。
+![](./assets/design.png)
 
-其中`SW1`为电源开关。`SW2`为大小写开关。`SW3`为蜂鸣器开关。
+本键盘有物理开关`3`个，物理按键`1`个，Type-C充电接口`1`个。
 
 ### 状态灯
 
@@ -70,5 +70,7 @@
 
 ## 关联项目
 
-父仓库：[HAMKey](https://github.com/HelloWorksGroup/HAM-Key)
+- 父仓库：[HAMKey](https://github.com/HelloWorksGroup/HAM-Key)
+- 3D设计：[HAMKey-Lite-3D](https://github.com/Nigh/HAMKey-Lite-3D)
+- layout：[HAMKey-Lite-layout](https://github.com/Nigh/HAMKey-Lite-layout)
 
