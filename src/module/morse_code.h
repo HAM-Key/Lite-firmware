@@ -5,6 +5,10 @@
 #include <stdint.h>
 #include "usb_hid_keys.h"
 
+#define KEYCODE_ERROR          0xFD
+#define KEYCODE_SOS            0xFE
+#define KEYCODE_UNDEFINED      0xFF
+
 typedef struct morse_code {
 	const struct morse_code const* dit;
 	const struct morse_code const* dah;
@@ -20,10 +24,16 @@ const sMC node_null = {
 	0xFF
 };
 
-NODEF(SOS, 0xFE);
+// custom key: sos
+NODEF(SOS, KEYCODE_SOS);
 NODE(3100, 0xFF, SOS, null);
 NODE(310, 0xFF, 3100, null);
 NODE(31, 0xFF, 310, null);
+
+// custom key: error
+NODEF(error, KEYCODE_ERROR);
+NODE(dit7, 0xFF, error, null);
+NODE(dit6, 0xFF, dit7, null);
 
 // dit
 NODEF(apostrophe, KEY_APOSTROPHE);
@@ -37,7 +47,7 @@ NODEF(2, KEY_2);
 NODE(v0, 0xFF,  null,  end);
 NODE(3, KEY_3, null, 31);
 NODEF(4, KEY_4);
-NODEF(5, KEY_5);
+NODE(5, KEY_5, dit6, null);
 NODEF(p, KEY_P);
 NODE(j, KEY_J, null, 1);
 NODE(r1, 0xFF, r10, null);
