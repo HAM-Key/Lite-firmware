@@ -231,6 +231,7 @@ static void dida_parse(void) {
 		uint8_t send_code = morse_code_parse(valid_cache, dida_depth);
 		if(send_code == KEYCODE_ERROR) {
 			char_send(KEY_BACKSPACE, KEY_MOD_LCTRL);
+			char_send(KEY_NONE, 0);
 			dida_idle_timer = 0;
 		} else if(send_code == KEYCODE_SOS) {
 			uint8_t mod;
