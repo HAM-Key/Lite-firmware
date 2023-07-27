@@ -7,11 +7,19 @@ MEMORY
 {
   FLASH (rx) : ORIGIN = 0x1c000, LENGTH = 0x14000
   RAM (rwx) :  ORIGIN = 0x20002700, LENGTH = 0x3900
+  uicr_nfc (r) : ORIGIN = 0x1000120C, LENGTH = 0x4
 }
 
 SECTIONS
 {
-}
+	. = ALIGN(4);
+	.uicr_nfc_section :
+	{
+    	PROVIDE(__start_uicr_nfc_section = .);
+    	KEEP(*(.uicr_nfc_section))
+    	PROVIDE(__stop_uicr_nfc_section = .);
+	} > uicr_nfc
+} INSERT AFTER .text
 
 SECTIONS
 {
